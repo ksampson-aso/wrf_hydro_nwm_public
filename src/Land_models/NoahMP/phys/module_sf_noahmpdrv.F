@@ -1,3 +1,23 @@
+!  Program Name:
+!  Author(s)/Contact(s):
+!  Abstract:
+!  History Log:
+!
+!  Usage:
+!  Parameters: <Specify typical arguments passed>
+!  Input Files:
+!        <list file names and briefly describe the data they include>
+!  Output Files:
+!        <list file names and briefly describe the information they include>
+!
+!  Condition codes:
+!        <list exit condition or error codes returned >
+!        If appropriate, descriptive troubleshooting instructions or
+!        likely causes for failures could be mentioned here with the
+!        appropriate error code
+!
+!  User controllable options: <if applicable>
+
 MODULE module_sf_noahmpdrv
 
 !-------------------------------
@@ -17,7 +37,7 @@ CONTAINS
               IOPT_INF, IOPT_RAD,  IOPT_ALB, IOPT_SNF,IOPT_TBOT, IOPT_STC,  & ! IN : User options
               IOPT_GLA, IOPT_RSF, IOPT_SOIL,IOPT_PEDO,IOPT_CROP,            & ! IN : User options
               IOPT_IMPERV, IZ0TLND,                                         & ! IN : User options
-                   T3D,     QV3D,     U_PHY,    V_PHY,   SWDOWN,      GLW,  & ! IN : Forcing
+                   T3D,     QV3D,     U_PHY,    V_PHY,   SWDOWN,      GLW, BurnSeverity, & ! IN : Forcing
 		 P8W3D,PRECIP_IN,        SR,                                & ! IN : Forcing
                    TSK,      HFX,      QFX,        LH,   GRDFLX,    SMSTAV, & ! IN/OUT LSM eqv
                 SMSTOT,SFCRUNOFF, UDRUNOFF,    ALBEDO,    SNOWC,     SMOIS, & ! IN/OUT LSM eqv
@@ -129,6 +149,9 @@ CONTAINS
     REAL,    DIMENSION( ims:ime, kms:kme, jms:jme ), INTENT(IN   ) ::  P8W3D     ! 3D pressure, valid at interface [Pa]
     REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(IN   ) ::  PRECIP_IN ! total input precipitation [mm]
     REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(IN   ) ::  SR        ! frozen precipitation ratio [-]
+
+!Added by Ronnie:
+    REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(IN   ) ::  BurnSeverity    ! Burn severity
 
 !Optional Detailed Precipitation Partitioning Inputs
     REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(IN   ), OPTIONAL ::  MP_RAINC  ! convective precipitation entering land model [mm] ! MB/AN : v3.7
@@ -328,6 +351,8 @@ CONTAINS
     REAL                                :: PRCPOTHR     ! other precip, e.g. fog [mm]                ! MB/AN : v3.7
 
 ! INOUT (with generic LSM equivalent)
+!Added by Ronnie
+   REAL                                :: BurnSev         ! burn severity
 
     REAL                                :: FSH          ! total sensible heat (w/m2) [+ to atm]
     REAL                                :: SSOIL        ! soil heat heat (w/m2)
@@ -695,6 +720,9 @@ CONTAINS
        LWDN   = GLW(I,J)                              ! total longwave down from LW scheme [W/m2]
        P_ML   =(P8W3D(I,KTS+1,J)+P8W3D(I,KTS,J))*0.5  ! surface pressure defined at intermediate level [Pa]
 	                                              !    consistent with temperature, mixing ratio
+
+!Added by ronnie:
+       BurnSev = BurnSeverity(I,J)                           ! burn severity
        PSFC   = P8W3D(I,1,J)                          ! surface pressure defined a full levels [Pa]
        PRCP   = PRECIP_IN (I,J) / DT                  ! timestep total precip rate (glacier) [mm/s]! MB: v3.7
 
@@ -1273,7 +1301,7 @@ CONTAINS
             FVEG    , FVGMAX  , VEGTYP  , ICE     , IST     , CROPTYPE, & ! IN : Vegetation/Soil characteristics
             SMCEQ   ,                                                   & ! IN : Vegetation/Soil characteristics
             T_ML    , P_ML    , PSFC    , U_ML    , V_ML    , Q_ML    , & ! IN : Forcing
-            QC      , SWDN    , LWDN    ,                               & ! IN : Forcing
+            QC      , SWDN    , LWDN    ,          BurnSev,                     & ! IN : Forcing
 	    PRCPCONV, PRCPNONC, PRCPSHCV, PRCPSNOW, PRCPGRPL, PRCPHAIL, & ! IN : Forcing
             TBOT    , CO2PP   , O2PP    , FOLN    , FICEOLD , Z_ML    , & ! IN : Forcing
             ALBOLD  , SNEQVO  ,                                         & ! IN/OUT :
@@ -1377,7 +1405,7 @@ CONTAINS
              SNOW     (I,J)                = SWE
              SNOWH    (I,J)                = SNDPTH
              CANWAT   (I,J)                = CANLIQ + CANICE
-             ACSNOW   (I,J)                = ACSNOW(I,J) + PRCP*DT * FPICE ! mm
+             ACSNOW   (I,J)                = ACSNOW(I,J) + PRCP * FPICE
              ACSNOM   (I,J)                = ACSNOM(I,J) + QSNBOT*DT + PONDING + PONDING1 + PONDING2
              EMISS    (I,J)                = EMISSI
              QSFC     (I,J)                = QSFC1D
@@ -1497,7 +1525,7 @@ CONTAINS
                    SNOW     (I,J) = PSNOWTOTSWEXY(I,J)
                    SNOWH    (I,J) = PSNOWHEIGHTXY(I,J)
                    ACSNOM   (I,J) = FLOW_ICE(I,J)+FLOW_SNOW(I,J)
-                   CANWAT   (I,J) = 0.
+                   CANWAT   (I,J) = 0. 
 #ifdef WRF_HYDRO
                    if(present(ACCETRAN)) ACCETRAN(I,J) = 0.
                    if(present(ACCECAN))  ACCECAN(I,J)  = 0.

@@ -1,3 +1,23 @@
+!  Program Name:
+!  Author(s)/Contact(s):
+!  Abstract:
+!  History Log:
+!
+!  Usage:
+!  Parameters: <Specify typical arguments passed>
+!  Input Files:
+!        <list file names and briefly describe the data they include>
+!  Output Files:
+!        <list file names and briefly describe the information they include>
+!
+!  Condition codes:
+!        <list exit condition or error codes returned >
+!        If appropriate, descriptive troubleshooting instructions or
+!        likely causes for failures could be mentioned here with the
+!        appropriate error code
+!
+!  User controllable options: <if applicable>
+
 module module_NoahMP_hrldas_driver
 
   USE module_hrldas_netcdf_io
@@ -41,9 +61,8 @@ module module_NoahMP_hrldas_driver
    REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  ACCECAN  ! accumulated canopy evap [mm]
    REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  ACCETRAN ! accumulated transpiration [mm]
    REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  ACCEDIR ! accumulated direct soil evap [mm]
-   integer :: io_config_outputs = 0
-   integer :: reset_flag = 0
-   integer :: t0OutputFlag = 0
+   integer :: io_config_outputs=0
+   integer :: t0OutputFlag=0
    REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  SOILSAT_TOP ! top 2 layer soil saturation [fraction]
    REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  SOILSAT ! column integrated soil saturation [fraction]
    REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  SOILICE ! fraction of soil moisture that is ice [fraction]
@@ -117,7 +136,6 @@ module module_NoahMP_hrldas_driver
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  GLW       ! longwave down at surface [W m-2]
   REAL,    ALLOCATABLE, DIMENSION(:,:,:)  ::  P8W       ! 3D pressure, valid at interface [Pa]
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  RAINBL, RAINBL_tmp    ! precipitation entering land model [mm]
-  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  SNOWBL    ! snow entering land model [mm]
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  SR        ! frozen precip ratio entering land model [-]
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  RAINCV    ! convective precip forcing [mm]
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  RAINNCV   ! non-convective precip forcing [mm]
@@ -125,6 +143,9 @@ module module_NoahMP_hrldas_driver
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  SNOWNCV   ! non-covective snow forcing (subset of rainncv) [mm]
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  GRAUPELNCV! non-convective graupel forcing (subset of rainncv) [mm]
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  HAILNCV   ! non-convective hail forcing (subset of rainncv) [mm]
+
+!Added by Ronnie:
+ REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  BurnSeverity    ! Burn severity
 
 ! New spatially varying fields
 
@@ -744,7 +765,6 @@ module module_NoahMP_hrldas_driver
   ALLOCATE ( GLW       (XSTART:XEND,YSTART:YEND) )    ! longwave down at surface [W m-2]
   ALLOCATE ( P8W       (XSTART:XEND,KDS:KDE,YSTART:YEND) )  ! 3D pressure, valid at interface [Pa]
   ALLOCATE ( RAINBL    (XSTART:XEND,YSTART:YEND) )    ! total precipitation entering land model [mm]
-  ALLOCATE ( SNOWBL    (XSTART:XEND,YSTART:YEND) )    ! snow entering land model [mm]
   ALLOCATE ( RAINBL_tmp    (XSTART:XEND,YSTART:YEND) )    ! precipitation entering land model [mm]
   ALLOCATE ( SR        (XSTART:XEND,YSTART:YEND) )    ! frozen precip ratio entering land model [-]
   ALLOCATE ( RAINCV    (XSTART:XEND,YSTART:YEND) )    ! convective precip forcing [mm]
@@ -753,6 +773,9 @@ module module_NoahMP_hrldas_driver
   ALLOCATE ( SNOWNCV   (XSTART:XEND,YSTART:YEND) )    ! non-covective snow forcing (subset of rainncv) [mm]
   ALLOCATE ( GRAUPELNCV(XSTART:XEND,YSTART:YEND) )    ! non-convective graupel forcing (subset of rainncv) [mm]
   ALLOCATE ( HAILNCV   (XSTART:XEND,YSTART:YEND) )    ! non-convective hail forcing (subset of rainncv) [mm]
+
+!Added by Ronnie
+  ALLOCATE ( BurnSeverity    (XSTART:XEND,YSTART:YEND) )    ! BurnSeverity
 
 #ifdef SPATIAL_SOIL
   ALLOCATE ( bexp_3d    (XSTART:XEND,1:NSOIL,YSTART:YEND) )    ! C-H B exponent
@@ -986,9 +1009,13 @@ module module_NoahMP_hrldas_driver
   V_PHY      = undefined_real
   SWDOWN     = undefined_real
   GLW        = undefined_real
+
+!Added by Ronnie
+  BurnSeverity     = undefined_real
+
+
   P8W        = undefined_real
   RAINBL     = undefined_real
-  SNOWBL     = undefined_real
   RAINBL_tmp = undefined_real
   SR         = undefined_real
   RAINCV     = undefined_real
@@ -1168,11 +1195,11 @@ module module_NoahMP_hrldas_driver
      !PSNOWAGEXY     = undefined_real
 
 ! These should probably be kept initialized with an undefined value (above)
-! to allow tracking of cells that fall through the cracks in value updates
+! to allow tracking of cells that fall through the cracks in value updates 
 ! (also worth noting that 0 is not a valid value for all of these variables).
-! However, since restarts are not currently water-masking 2d reals, this makes
+! However, since restarts are not currently water-masking 2d reals, this makes 
 ! for odd value ranges in the LSM restarts so leaving as 0s for now.
-! On quick tests, the only one of these that changes answers if NOT initialized
+! On quick tests, the only one of these that changes answers if NOT initialized 
 ! at 0 is PSNOWHISTXY so making sure that one is covered in value initialization
 ! loop below in case we go back to undefined_real for these.
      PSNOWLIQXY     = 0.
@@ -1534,10 +1561,9 @@ module module_NoahMP_hrldas_driver
          olddate,zsoil(1:NSOIL))
 
 call get_iocflag(1, io_config_outputs)
-call get_rstrt_swc(1, reset_flag)
 
 #ifdef WRF_HYDRO
-if (reset_flag == 1) then
+if (io_config_outputs .gt. 0) then
      ACCPRCP = 0.0
      ACCECAN = 0.0
      ACCEDIR = 0.0
@@ -1558,7 +1584,7 @@ endif
                   'CHV2,CHB2,LFMASS,RTMASS,STMASS,WOOD,STBLCP,FASTCP,NEE,GPP,NPP,PSN,APAR,ACCET,CANWAT,SOILICE,SOILSAT_TOP,'// &
                   'SOILSAT,SNOWT_AVG,QRAIN,glacier,glacier_thickness,PSNOWALB,PSNOWTHRUFAL,PSNOWHEIGHT,PSNOWTOTSWE,'// &
                   'PSNOWGRAN1,PSNOWGRAN2,PSNOWAGE,PSNOWTEMP,PSNOWDZ,PSNOWHIST,PSNOWLIQ,PSNOWHEAT,PSNOWRHO,PSNOWSWE,'// &
-                  'FLOW_ICE,FLOW_SNOW'
+                  'FLOW_ICE,FLOW_SNOW,BURNSEVERITY'
 
    endif
    if (io_config_outputs .eq. 1) then
@@ -1709,26 +1735,15 @@ end subroutine land_driver_ini
      if(forc_typ .eq. 0) then
         CALL READFORC_HRLDAS(INFLNM_TEMPLATE, noah_lsm%FORCING_TIMESTEP, OLDDATE,  &
              XSTART, XEND, YSTART, YEND,                                  &
-             noah_lsm%forcing_name_T ,noah_lsm%forcing_name_Q ,noah_lsm%forcing_name_U , &
-	     noah_lsm%forcing_name_V ,noah_lsm%forcing_name_P ,noah_lsm%forcing_name_LW, &
-	     noah_lsm%forcing_name_SW,noah_lsm%forcing_name_PR,noah_lsm%forcing_name_SN, &
-	     noah_lsm%forcing_name_LF, &
              T_PHY(:,1,:),QV_CURR(:,1,:),U_PHY(:,1,:),V_PHY(:,1,:),          &
-             P8W(:,1,:), GLW       ,SWDOWN      ,RAINBL_tmp, &
-             SNOWBL, VEGFRA, update_veg, LAI, &
-             update_lai)
+	       P8W(:,1,:), GLW       ,SWDOWN      ,RAINBL_tmp, BurnSeverity,VEGFRA, update_veg, LAI, update_lai)
      else
         if(olddate == forcDate) then
-           CALL HYDRO_frocing_drv(trim(noah_lsm%indir), forc_typ, wrf_hydro%snow_assim, olddate,                     &
+           CALL HYDRO_frocing_drv(trim(noah_lsm%indir), forc_typ, wrf_hydro%snow_assim,olddate,                      &
                xstart, xend, ystart, yend,    &
-               noah_lsm%forcing_name_T ,noah_lsm%forcing_name_Q ,noah_lsm%forcing_name_U , &
-               noah_lsm%forcing_name_V ,noah_lsm%forcing_name_P ,noah_lsm%forcing_name_LW, &
-               noah_lsm%forcing_name_SW,noah_lsm%forcing_name_PR,noah_lsm%forcing_name_SN, &
-               noah_lsm%forcing_name_LF, &
-               T_PHY(:,1,:), QV_CURR(:,1,:), U_PHY(:,1,:), V_PHY(:,1,:), &
-               P8W(:,1,:), GLW, SWDOWN, RAINBL_tmp, &
-               LAI, SNOWBL, VEGFRA, state%SNOWH, &
-               ITIME, noah_lsm%FORCING_TIMESTEP, prcp0)
+               T_PHY(:,1,:),QV_CURR(:,1,:),U_PHY(:,1,:),V_PHY(:,1,:),P8W(:,1,:),    &
+               GLW,SWDOWN,RAINBL_tmp,BurnSeverity,LAI,VEGFRA,state%SNOWH,ITIME,noah_lsm%FORCING_TIMESTEP,prcp0)
+
                if(maxval(VEGFRA) .le. 1)  VEGFRA = VEGFRA * 100
 
            call geth_newdate(newdate, forcDate, noah_lsm%FORCING_TIMESTEP)
@@ -1739,12 +1754,8 @@ end subroutine land_driver_ini
 #else
      CALL READFORC_HRLDAS(INFLNM_TEMPLATE, noah_lsm%FORCING_TIMESTEP, OLDDATE,  &
           XSTART, XEND, YSTART, YEND,                                  &
-          noah_lsm%forcing_name_T ,noah_lsm%forcing_name_Q ,noah_lsm%forcing_name_U , &
-	  noah_lsm%forcing_name_V ,noah_lsm%forcing_name_P ,noah_lsm%forcing_name_LW, &
-	  noah_lsm%forcing_name_SW,noah_lsm%forcing_name_PR,noah_lsm%forcing_name_SN, &
-	  noah_lsm%forcing_name_LF, &
           T_PHY(:,1,:),QV_CURR(:,1,:),U_PHY(:,1,:),V_PHY(:,1,:),          &
-	    P8W(:,1,:), GLW       ,SWDOWN      ,RAINBL_tmp, SNOWBL, VEGFRA, update_veg, LAI, update_lai)
+	    P8W(:,1,:), GLW       ,SWDOWN      ,RAINBL_tmp, BurnSeverity,VEGFRA, update_veg, LAI, update_lai)
 #endif
 
 991  continue
@@ -1757,7 +1768,9 @@ end subroutine land_driver_ini
      where(XLAND > 1.5)     GLW        = 0.0
      where(XLAND > 1.5)  SWDOWN        = 0.0
      where(XLAND > 1.5) RAINBL_tmp     = 0.0
-     where(XLAND > 1.5) SNOWBL         = 0.0
+
+!Added by Ronnie
+    where(XLAND > 1.5)  BurnSeverity        = 0.0
 
      QV_CURR(:,1,:) = QV_CURR(:,1,:)/(1.0 - QV_CURR(:,1,:))  ! Assuming input forcing are specific hum.;
                                                              ! WRF wants mixing ratio at driver level
@@ -1767,12 +1780,11 @@ end subroutine land_driver_ini
      V_PHY(:,2,:)   = V_PHY(:,1,:)    !
      QV_CURR(:,2,:) = QV_CURR(:,1,:)  !
      RAINBL = RAINBL_tmp * DTBL       ! RAINBL in WRF is [mm]
-     SNOWBL = SNOWBL * DTBL           !
      SR         = 0.0                 ! Will only use component if opt_snf=4
      RAINCV     = 0.0
      RAINNCV    = RAINBL
      RAINSHV    = 0.0
-     SNOWNCV    = SNOWBL
+     SNOWNCV    = 0.0
      GRAUPELNCV = 0.0
      HAILNCV    = 0.0
      DZ8W = 2 * noah_lsm%ZLVL                    ! 2* to be consistent with WRF model level
@@ -1830,7 +1842,7 @@ end subroutine land_driver_ini
 	       IOPT_INF, IOPT_RAD, IOPT_ALB, IOPT_SNF, IOPT_TBOT,   IOPT_STC, &
 	       IOPT_GLA, IOPT_RSF,IOPT_SOIL,IOPT_PEDO, IOPT_CROP,             &
                IOPT_IMPERV, IZ0TLND,                                          &
-		  T_PHY,  QV_CURR,    U_PHY,    V_PHY,    SWDOWN,        GLW, &
+		  T_PHY,  QV_CURR,    U_PHY,    V_PHY,    SWDOWN,        GLW, BurnSeverity,&
 		    P8W,   RAINBL,       SR,                                  &
 		    TSK,      HFX,      QFX,       LH,    GRDFLX,     SMSTAV, &
 		 SMSTOT,SFCRUNOFF, UDRUNOFF,   ALBEDO,     SNOWC,      SMOIS, &
@@ -2015,6 +2027,9 @@ subroutine  ldas_output(itime, state)
 !              call add_to_output(COSZEN     , "COSZ"    , "Cosine of zenith angle"                    , "W m{-2}"               )
 !              call add_to_output(GLW        , "LWFORC"  , "Longwave forcing"                    , "W m{-2}"               )
 !              call add_to_output(RAINBL     , "RAINRATE", "Precipitation rate"                   , "kg m{-2} s{-1}"        )
+!Added by Ronnie
+!              call add_to_output(BurnSeverity     , "BurnSeverity"  , "BurnSeverity"                    , "category"               )
+
 !        ! Grid energy budget terms
 !              call add_to_output(EMISS      , "EMISS"   , "Grid emissivity"                    , ""               )
 !              call add_to_output(FSAXY      , "FSA"     , "Total absorbed SW radiation"          , "W m{-2}"               )
@@ -2244,6 +2259,7 @@ subroutine  ldas_output(itime, state)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWSWEXY,IVGTYP,114)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,FLOW_ICE,IVGTYP,115)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,FLOW_SNOW,IVGTYP,116)
+   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,BurnSeverity,IVGTYP,117)
    end if ! crocus_opt /= 0
 #endif /* WRF_HYDRO */
 

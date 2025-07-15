@@ -1,3 +1,23 @@
+!  Program Name:
+!  Author(s)/Contact(s):
+!  Abstract:
+!  History Log:
+!
+!  Usage:
+!  Parameters: <Specify typical arguments passed>
+!  Input Files:
+!        <list file names and briefly describe the data they include>
+!  Output Files:
+!        <list file names and briefly describe the information they include>
+!
+!  Condition codes:
+!        <list exit condition or error codes returned >
+!        If appropriate, descriptive troubleshooting instructions or
+!        likely causes for failures could be mentioned here with the
+!        appropriate error code
+!
+!  User controllable options: <if applicable>
+
 MODULE MODULE_SF_NOAHMPLSM
 
   IMPLICIT NONE
@@ -379,7 +399,7 @@ contains
                    SHDFAC  , SHDMAX  , VEGTYP  , ICE     , IST     , CROPTYPE, & ! IN : Vegetation/Soil characteristics
                    SMCEQ   ,                                                   & ! IN : Vegetation/Soil characteristics
                    SFCTMP  , SFCPRS  , PSFC    , UU      , VV      , Q2      , & ! IN : Forcing
-                   QC      , SOLDN   , LWDN    ,                               & ! IN : Forcing
+                   QC      , SOLDN   , LWDN    ,   BurnSev,                            & ! IN : Forcing
 	           PRCPCONV, PRCPNONC, PRCPSHCV, PRCPSNOW, PRCPGRPL, PRCPHAIL, & ! IN : Forcing
                    TBOT    , CO2AIR  , O2AIR   , FOLN    , FICEOLD , ZLVL    , & ! IN : Forcing
                    ALBOLD  , SNEQVO  ,                                         & ! IN/OUT :
@@ -451,6 +471,10 @@ contains
   REAL                           , INTENT(IN)    :: PRCPSNOW ! snow entering land model [mm/s]              ! MB/AN : v3.7
   REAL                           , INTENT(IN)    :: PRCPGRPL ! graupel entering land model [mm/s]           ! MB/AN : v3.7
   REAL                           , INTENT(IN)    :: PRCPHAIL ! hail entering land model [mm/s]              ! MB/AN : v3.7
+
+!Added by Ronnie:
+  REAL                           , INTENT(IN)    :: BurnSev  !burn severity forcing
+
 
 !jref:start; in
   REAL                           , INTENT(IN)    :: QC     !cloud water mixing ratio
@@ -767,7 +791,7 @@ contains
                  FSRG   ,RSSUN   ,RSSHA ,ALBSND  ,ALBSNI, BGAP   ,WGAP,TGV,TGB,&
                  Q1     ,Q2V    ,Q2B    ,Q2E    ,CHV   ,CHB     , & !out
                  EMISSI ,PAH    ,                                 &
-		     SHG,SHC,SHB,EVG,EVB,GHV,GHB,IRG,IRC,IRB,TR,EVC,CHLEAF,CHUC,CHV2,CHB2 )                                            !out
+		     SHG,SHC,SHB,EVG,EVB,GHV,GHB,IRG,IRC,IRB,TR,EVC,CHLEAF,CHUC,CHV2,CHB2 ,BurnSev)                                            !out
 !jref:end
 
     SICE(:) = MAX(0.0, SMC(:) - SH2O(:))
@@ -1521,7 +1545,7 @@ ENDIF   ! CROPTYPE == 0
                      T2MV   ,T2MB   ,FSRV   , &
                      FSRG   ,RSSUN  ,RSSHA  ,ALBSND  ,ALBSNI,BGAP   ,WGAP,TGV,TGB,&
                      Q1     ,Q2V    ,Q2B    ,Q2E    ,CHV  ,CHB, EMISSI,PAH  ,&
-		     SHG,SHC,SHB,EVG,EVB,GHV,GHB,IRG,IRC,IRB,TR,EVC,CHLEAF,CHUC,CHV2,CHB2 )   !out
+		     SHG,SHC,SHB,EVG,EVB,GHV,GHB,IRG,IRC,IRB,TR,EVC,CHLEAF,CHUC,CHV2,CHB2 ,BurnSev)   !out
 !jref:end
 
 ! --------------------------------------------------------------------------------------------------
@@ -1569,6 +1593,10 @@ ENDIF   ! CROPTYPE == 0
   INTEGER                           , INTENT(IN)    :: NSNOW  !maximum no. of snow layers
   INTEGER                           , INTENT(IN)    :: NSOIL  !number of soil layers
   INTEGER                           , INTENT(IN)    :: ISNOW  !actual no. of snow layers
+!Added by Ronnie:
+REAL                           , INTENT(IN)    :: BurnSev  !actual no. of snow layers
+
+
   REAL                              , INTENT(IN)    :: DT     !time step [sec]
   REAL                              , INTENT(IN)    :: QSNOW  !snowfall on the ground (mm/s)
   REAL                              , INTENT(IN)    :: RHOAIR !density air (kg/m3)
@@ -1879,7 +1907,7 @@ ENDIF   ! CROPTYPE == 0
                    ALBOLD  ,TAUSS   ,                            & !inout
                    FSUN    ,LAISUN  ,LAISHA  ,PARSUN  ,PARSHA  , & !out
                    SAV     ,SAG     ,FSR     ,FSA     ,FSRV    , &
-                   FSRG    ,ALBSND  ,ALBSNI  ,BGAP    ,WGAP     )  !out
+                   FSRG    ,ALBSND  ,ALBSNI  ,BGAP    ,WGAP  ,BurnSev   )  !out
 
 ! vegetation and ground emissivity
 
@@ -2421,7 +2449,7 @@ ENDIF   ! CROPTYPE == 0
                         ALBOLD  ,TAUSS   ,                            & !inout
                         FSUN    ,LAISUN  ,LAISHA  ,PARSUN  ,PARSHA  , & !out
                         SAV     ,SAG     ,FSR     ,FSA     ,FSRV    , &
-                        FSRG    ,ALBSND  ,ALBSNI  ,BGAP    ,WGAP    )   !out
+                        FSRG    ,ALBSND  ,ALBSNI  ,BGAP    ,WGAP,BurnSev    )   !out
 ! --------------------------------------------------------------------------------------------------
   IMPLICIT NONE
 ! --------------------------------------------------------------------------------------------------
@@ -2433,6 +2461,8 @@ ENDIF   ! CROPTYPE == 0
   INTEGER, INTENT(IN)                  :: IST    !surface type
   INTEGER, INTENT(IN)                  :: ICE    !ice (ice = 1)
   INTEGER, INTENT(IN)                  :: NSOIL  !number of soil layers
+REAL, INTENT(IN)                  :: BurnSev  !number of soil layers
+
 
   REAL, INTENT(IN)                     :: DT     !time step [s]
   REAL, INTENT(IN)                     :: QSNOW  !snowfall (mm/s)
@@ -2512,7 +2542,7 @@ ENDIF   ! CROPTYPE == 0
                 ALBGRD ,ALBGRI ,ALBD   ,ALBI   ,FABD   , & !out
                 FABI   ,FTDD   ,FTID   ,FTII   ,FSUN   , & !)   !out
                 FREVI  ,FREVD   ,FREGD ,FREGI  ,BGAP   , & !inout
-                WGAP   ,ALBSND ,ALBSNI )
+                WGAP   ,ALBSND ,ALBSNI,BurnSev )
 
 ! surface radiation
 
@@ -2548,7 +2578,7 @@ ENDIF   ! CROPTYPE == 0
                      ALBGRD ,ALBGRI ,ALBD   ,ALBI   ,FABD   , & !out
                      FABI   ,FTDD   ,FTID   ,FTII   ,FSUN   , & !out
                      FREVI  ,FREVD  ,FREGD  ,FREGI  ,BGAP   , & !out
-                     WGAP   ,ALBSND ,ALBSNI )
+                     WGAP   ,ALBSND ,ALBSNI,BurnSev )
 
 ! --------------------------------------------------------------------------------------------------
 ! surface albedos. also fluxes (per unit incoming direct and diffuse
@@ -2580,6 +2610,10 @@ ENDIF   ! CROPTYPE == 0
   REAL,                     INTENT(IN)  :: SNEQV  !snow mass (mm)
   REAL,                     INTENT(IN)  :: FVEG   !green vegetation fraction [0.0-1.0]
   REAL, DIMENSION(1:NSOIL), INTENT(IN)  :: SMC    !volumetric soil water (m3/m3)
+
+!Added by Ronnie:
+REAL,                  INTENT(IN)  :: BurnSev !vegetation type
+
 
 ! inout
   REAL,                  INTENT(INOUT)  :: ALBOLD !snow albedo at last time step (CLASS type)
@@ -2666,12 +2700,12 @@ ENDIF   ! CROPTYPE == 0
 
 ! snow age
 
-   CALL SNOW_AGE (parameters,DT,TG,SNEQVO,SNEQV,TAUSS,FAGE)
+   CALL SNOW_AGE (parameters,DT,TG,SNEQVO,SNEQV,TAUSS,FAGE,BurnSev)
 
 ! snow albedos: only if COSZ > 0 and FSNO > 0
 
   IF(OPT_ALB == 1) &
-     CALL SNOWALB_BATS (parameters,NBAND, FSNO,COSZ,FAGE,ALBSND,ALBSNI)
+     CALL SNOWALB_BATS (parameters,NBAND, FSNO,COSZ,FAGE,ALBSND,ALBSNI,BurnSev)
   IF(OPT_ALB == 2) THEN
      CALL SNOWALB_CLASS (parameters,NBAND,QSNOW,DT,ALB,ALBOLD,ALBSND,ALBSNI,ILOC,JLOC)
      ALBOLD = ALB
@@ -2848,7 +2882,7 @@ ENDIF   ! CROPTYPE == 0
 
 !== begin snow_age =================================================================================
 
-  SUBROUTINE SNOW_AGE (parameters,DT,TG,SNEQVO,SNEQV,TAUSS,FAGE)
+  SUBROUTINE SNOW_AGE (parameters,DT,TG,SNEQVO,SNEQV,TAUSS,FAGE,BurnSev)
 ! ----------------------------------------------------------------------
   IMPLICIT NONE
 ! ------------------------ code history ------------------------------------------------------------
@@ -2860,7 +2894,7 @@ ENDIF   ! CROPTYPE == 0
    REAL, INTENT(IN) :: TG        !ground temperature (k)
    REAL, INTENT(IN) :: SNEQVO    !snow mass at last time step(mm)
    REAL, INTENT(IN) :: SNEQV     !snow water per unit ground area (mm)
-
+   
 !output
    REAL, INTENT(OUT) :: FAGE     !snow age
 
@@ -2876,8 +2910,18 @@ ENDIF   ! CROPTYPE == 0
    REAL            :: DELS       !temporary variable
    REAL            :: DELA0      !temporary variable
    REAL            :: ARG        !temporary variable
+
+!ADDED BY RONNIE:
+REAL, INTENT(IN) :: BurnSev     !burn severity forcing
+    REAL            :: active_DIRT_SOOT        !temporary variable
+
 ! See Yang et al. (1997) J.of Climate for detail.
 !---------------------------------------------------------------------------------------------------
+
+    
+
+       
+
 
    IF(SNEQV.LE.0.0) THEN
           TAUSS = 0.
@@ -2886,7 +2930,28 @@ ENDIF   ! CROPTYPE == 0
           ARG   = parameters%GRAIN_GROWTH*(1./TFRZ-1./TG)
           AGE1  = EXP(ARG)
           AGE2  = EXP(AMIN1(0.,parameters%EXTRA_GROWTH*ARG))
-          AGE3  = parameters%DIRT_SOOT
+
+!!update dirt_soot parameter if pixel is burned (added by Ronnie):
+!NOTES: THIS IMPLEMENTATION IS ONLY FOR THE ASO PROJECT SUCH THAT PIXELS ARE CONSIDERED BURNED FOR THE ENTIRE ANALYSIS PERIOD
+!A MORE SOPHISTICATED UPDATE WILL REQUIRE MAKING DIRT_SOOT A DYNAMIC VARIABLE THAT NEEDS TO BE ADDED TO RESTART FILES
+    IF(BurnSev .LE. 1 ) THEN !pixel is no burn at this time step
+        active_DIRT_SOOT = parameters%DIRT_SOOT !(0.3)
+    ENDIF
+    IF(BurnSev .EQ. 2 ) THEN !pixel is burned at this time step at a low severity
+        active_DIRT_SOOT = 0.4
+    ENDIF
+    IF(BurnSev .EQ. 3 ) THEN !pixel is burned at this time step at a mid severity
+        active_DIRT_SOOT = 0.5
+    ENDIF
+    IF(BurnSev .EQ. 4 ) THEN !pixel is burned at this time step at a high severity
+        active_DIRT_SOOT = 0.6 !determined by snow_alb_bats_testing.m
+    ENDIF
+
+    !!print*,  "BurnSev:",BurnSev
+    !!print*,  "active_DIRT_SOOT:",active_DIRT_SOOT
+          AGE3  = active_DIRT_SOOT
+
+
           TAGE  = AGE1+AGE2+AGE3
           DELA  = DELA0*TAGE
           DELS  = AMAX1(0.0,SNEQV-SNEQVO) / parameters%SWEMX
@@ -2900,7 +2965,7 @@ ENDIF   ! CROPTYPE == 0
 
 !== begin snowalb_bats =============================================================================
 
-  SUBROUTINE SNOWALB_BATS (parameters,NBAND,FSNO,COSZ,FAGE,ALBSND,ALBSNI)
+  SUBROUTINE SNOWALB_BATS (parameters,NBAND,FSNO,COSZ,FAGE,ALBSND,ALBSNI,BurnSev)
 ! --------------------------------------------------------------------------------------------------
   IMPLICIT NONE
 ! --------------------------------------------------------------------------------------------------
@@ -2912,6 +2977,7 @@ ENDIF   ! CROPTYPE == 0
   REAL,INTENT(IN) :: COSZ    !cosine solar zenith angle
   REAL,INTENT(IN) :: FSNO    !snow cover fraction (-)
   REAL,INTENT(IN) :: FAGE    !snow age correction
+  REAL,INTENT(IN) :: BurnSev    !snow age correction
 
 ! output
 
@@ -2926,7 +2992,11 @@ ENDIF   ! CROPTYPE == 0
   REAL :: CF1                  !temperary variable
   REAL :: SL2                  !2.*SL
   REAL :: SL1                  !1/SL
-  REAL :: SL                   !adjustable parameter
+
+!Added by Ronnie
+  REAL :: active_BATS_VIS_AGE
+
+REAL :: SL                   !adjustable parameter
 !  REAL, PARAMETER :: C1 = 0.2  !default in BATS
 !  REAL, PARAMETER :: C2 = 0.5  !default in BATS
 !  REAL, PARAMETER :: C1 = 0.2 * 2. ! double the default to match Sleepers River's
@@ -2937,6 +3007,25 @@ ENDIF   ! CROPTYPE == 0
         ALBSND(1: NBAND) = 0.
         ALBSNI(1: NBAND) = 0.
 
+
+!NOTES: THIS IMPLEMENTATION IS ONLY FOR THE ASO PROJECT SUCH THAT PIXELS ARE CONSIDERED BURNED FOR THE ENTIRE ANALYSIS PERIOD
+!A MORE SOPHISTICATED UPDATE WILL REQUIRE MAKING BATS_VIS_AGE  A DYNAMIC VARIABLE THAT NEEDS TO BE ADDED TO RESTART FILES
+    IF(BurnSev .LE. 1 ) THEN !pixel is no burn at this time step
+        active_BATS_VIS_AGE = parameters%BATS_VIS_AGE !(0.2)
+    ENDIF
+    IF(BurnSev .EQ. 2 ) THEN !pixel is burned at this time step at a low severity
+        active_BATS_VIS_AGE = 0.43
+    ENDIF
+    IF(BurnSev .EQ. 3 ) THEN !pixel is burned at this time step at a mid severity
+        active_BATS_VIS_AGE = 0.67
+    ENDIF
+    IF(BurnSev .EQ. 4 ) THEN !pixel is burned at this time step at a high severity
+        active_BATS_VIS_AGE = 0.9 !determined by snow_alb_bats_testing.m
+    ENDIF
+
+    !!print*,  "BurnSev:",BurnSev
+    !!print*,  "active_BATS_VIS_AGE:",active_BATS_VIS_AGE
+
 ! when cosz > 0
 
         SL=parameters%BATS_COSZ
@@ -2945,7 +3034,7 @@ ENDIF   ! CROPTYPE == 0
         CF1=((1.+SL1)/(1.+SL2*COSZ)-SL1)
         FZEN=AMAX1(CF1,0.)
 
-        ALBSNI(1)=parameters%BATS_VIS_NEW*(1.-parameters%BATS_VIS_AGE*FAGE)
+        ALBSNI(1)=parameters%BATS_VIS_NEW*(1.-active_BATS_VIS_AGE*FAGE)
         ALBSNI(2)=parameters%BATS_NIR_NEW*(1.-parameters%BATS_NIR_AGE*FAGE)
 
         ALBSND(1)=ALBSNI(1)+parameters%BATS_VIS_DIR*FZEN*(1.-ALBSNI(1))    !  vis direct
