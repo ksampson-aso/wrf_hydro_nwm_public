@@ -257,7 +257,7 @@ contains
 
         !!DJG Set hardwire for LAKE_OPT...move specification of this to namelist in
         !future versions...
-        LAKE_OPT = 2
+        LAKE_OPT = 1
         Htmp = H   !temporary set of incoming lake water elevation...
         !hdiff_vol = 0.0
         !qdiff_vol = 0.0

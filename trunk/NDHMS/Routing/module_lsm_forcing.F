@@ -42,14 +42,14 @@ end interface
 
 Contains
 
-  subroutine READFORC_WRF(flnm,ix,jx,target_date,t,q,u,v,p,lw,sw,pcp,lai,fpar)
+  subroutine READFORC_WRF(flnm,ix,jx,target_date,t,q,u,v,p,lw,sw,pcp,lai,fpar,BurnSeverity)
 
     implicit none
     character(len=*),                   intent(in)  :: flnm
     integer,                            intent(in)  :: ix
     integer,                            intent(in)  :: jx
     character(len=*),                   intent(in)  :: target_date
-    real,             dimension(ix,jx) :: t,q,u,v,p,lw,sw,pcp,pcpc, lai,fpar
+    real,             dimension(ix,jx) :: t,q,u,v,p,lw,sw,pcp,pcpc, lai,fpar,BurnSeverity
     integer   tlevel
 
     character(len=256) :: units
@@ -78,6 +78,8 @@ Contains
     call get_2d_netcdf_ruc("RAINC",  ncid, pcpc,  ix, jx,tlevel, .true., ierr)
     call get_2d_netcdf_ruc("RAINNC", ncid, pcp,   ix, jx,tlevel, .true., ierr)
     call get_2d_netcdf_ruc("VEGFRA", ncid, fpar,  ix, jx,tlevel, .true., ierr)
+    call get_2d_netcdf_ruc("BurnSeverity", ncid, BurnSeverity,  ix, jx,tlevel, .true., ierr)
+
     if(ierr == 0) then
         if(maxval(fpar) .gt. 10 .and. (maxval(fpar) .lt. 10000) ) fpar = fpar*0.01
     endif
@@ -443,7 +445,7 @@ Contains
 
 
 
-  subroutine READFORC_HRLDAS(flnm,ix,jx,target_date, t,q,u,v,p,lw,sw,pcp,lai,fpar)
+  subroutine READFORC_HRLDAS(flnm,ix,jx,target_date, t,q,u,v,p,lw,sw,pcp,BurnSeverity,lai,fpar)
     implicit none
 
     character(len=*),                   intent(in)  :: flnm
@@ -460,6 +462,7 @@ Contains
     real,             dimension(ix,jx), intent(out) :: pcp
     real,             dimension(ix,jx), intent(inout) :: lai
     real,             dimension(ix,jx), intent(inout) :: fpar
+    real,             dimension(ix,jx), intent(out) :: BurnSeverity
 
     character(len=256) :: units
     integer :: ierr
@@ -481,6 +484,8 @@ Contains
     call get_2d_netcdf("SWDOWN",  ncid, sw,    units, ix, jx, .TRUE., ierr)
     call get_2d_netcdf("RAINRATE",ncid, pcp,   units, ix, jx, .TRUE., ierr)
     call get_2d_netcdf("VEGFRA",  ncid, fpar,  units, ix, jx, .FALSE., ierr)
+    call get_2d_netcdf("BurnSeverity",  ncid, BurnSeverity,  units, ix, jx, .FALSE., ierr)
+
     if (ierr == 0) then
       if(maxval(fpar) .gt. 10 .and. maxval(fpar) .lt. 10000)  fpar = fpar * 1.E-2
     endif
@@ -648,7 +653,7 @@ Contains
 
 
 
-  subroutine READFORC_COWS(flnm,ix,jx,target_date, t,q,u,p,lw,sw,pcp,tlevel)
+  subroutine READFORC_COWS(flnm,ix,jx,target_date, t,q,u,p,lw,sw,pcp,BurnSeverity,tlevel)
     implicit none
 
     character(len=*),                   intent(in)  :: flnm
@@ -663,6 +668,7 @@ Contains
     real,             dimension(ix,jx), intent(out) :: lw
     real,             dimension(ix,jx), intent(out) :: sw
     real,             dimension(ix,jx), intent(out) :: pcp
+    real,             dimension(ix,jx), intent(out) :: BurnSeverity
     integer   tlevel
 
     character(len=256) :: units
@@ -683,6 +689,7 @@ Contains
     call get_2d_netcdf_cows("GLW",     ncid, lw,    ix, jx,tlevel, .TRUE., ierr)
     call get_2d_netcdf_cows("RSD",     ncid, sw,    ix, jx,tlevel, .TRUE., ierr)
     call get_2d_netcdf_cows("RAIN",    ncid, pcp,   ix, jx,tlevel, .TRUE., ierr)
+    call get_2d_netcdf_cows("BurnSeverity",    ncid, BurnSeverity,   ix, jx,tlevel, .TRUE., ierr)
 !yw   call get_2d_netcdf_cows("V2D",     ncid, v,     ix, jx,tlevel, .TRUE., ierr)
 
     ierr = nf_close(ncid)
@@ -692,7 +699,7 @@ Contains
 
 
 
-  subroutine READFORC_RUC(flnm,ix,jx,target_date,t,q,u,v,p,lw,sw,pcp)
+  subroutine READFORC_RUC(flnm,ix,jx,target_date,t,q,u,v,p,lw,sw,pcp,BurnSeverity)
 
     implicit none
 
@@ -700,7 +707,7 @@ Contains
     integer,                            intent(in)  :: ix
     integer,                            intent(in)  :: jx
     character(len=*),                   intent(in)  :: target_date
-    real,             dimension(ix,jx) :: t,q,u,v,p,lw,sw,pcp,pcpc
+    real,             dimension(ix,jx) :: t,q,u,v,p,lw,sw,pcp,pcpc,BurnSeverity
     integer   tlevel
 
     character(len=256) :: units
@@ -725,6 +732,7 @@ Contains
     call get_2d_netcdf_ruc("SWDOWN", ncid, sw,    ix, jx,tlevel, .true., ierr)
     call get_2d_netcdf_ruc("RAINC",  ncid, pcpc,  ix, jx,tlevel, .true., ierr)
     call get_2d_netcdf_ruc("RAINNC", ncid, pcp,   ix, jx,tlevel, .true., ierr)
+    call get_2d_netcdf_ruc("BurnSeverity", ncid, BurnSeverity,   ix, jx,tlevel, .true., ierr)
 
     ierr = nf_close(ncid)
 
@@ -900,7 +908,7 @@ Contains
  subroutine read_hydro_forcing_seq( &
        indir,olddate,hgrid, &
        ix,jx,forc_typ,snow_assim,  &
-       T2,q2x,u,v,pres,xlong,short,prcp1,&
+       T2,q2x,u,v,pres,xlong,short,prcp1,BurnSeverity,&
        lai,fpar,snodep,dt,k,prcp_old)
 ! This subrouting is going to read different forcing.
    implicit none
@@ -908,7 +916,7 @@ Contains
    character(len=*) :: olddate,hgrid,indir
    character(len=256) :: filename
    integer :: ix,jx,forc_typ,k,snow_assim  ! k is time loop
-   real,dimension(ix,jx):: T2,q2x,u,v,pres,xlong,short,prcp1,&
+   real,dimension(ix,jx):: T2,q2x,u,v,pres,xlong,short,prcp1,BurnSeverity,&
           prcpnew,weasd,snodep,prcp0,prcp2,prcp_old
    real ::  dt, wrf_dt
    ! tmp variable
@@ -938,7 +946,7 @@ Contains
         endif
 
       CALL READFORC_HRLDAS(inflnm,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-          PRES,XLONG,SHORT,PRCP1,LAI,FPAR)
+          PRES,XLONG,SHORT,PRCP1,BurnSeverity, LAI,FPAR)
    end if
 
 
@@ -957,7 +965,7 @@ Contains
            call hydro_stop("In read_hydro_forcing_seq() - no forcing data found")
         endif
       CALL READFORC_HRLDAS(inflnm,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-          PRES,XLONG,SHORT,PRCP1,LAI,FPAR)
+          PRES,XLONG,SHORT,PRCP1,BurnSeverity,LAI,FPAR)
    end if
 
 
@@ -999,9 +1007,9 @@ Contains
            print*, "read WRF forcing data: ", trim(inflnm2)
 #endif
        CALL READFORC_WRF(inflnm2,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-          PRES,XLONG,SHORT,PRCPnew,lai,fpar)
+          PRES,XLONG,SHORT,PRCPnew,lai,fpar,BurnSeverity)
        CALL READFORC_WRF(inflnm,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-          PRES,XLONG,SHORT,prcp0,lai,fpar)
+          PRES,XLONG,SHORT,prcp0,lai,fpar,BurnSeverity)
         PRCP1=(PRCPnew-prcp0)/wrf_dt   !Adjustment to convert accum to rate...(mm/s)
 
      end if
@@ -1143,7 +1151,7 @@ Contains
 #endif
 
            CALL READFORC_HRLDAS(inflnm,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-                PRES,XLONG,SHORT,PRCP1,LAI,FPAR)
+                PRES,XLONG,SHORT,PRCP1,BurnSeverity,LAI,FPAR)
            PRCP_old = PRCP1  ! This assigns new precip to last precip as a fallback for missing data...
         endif
 
@@ -1233,9 +1241,9 @@ Contains
            print*, "read WRF forcing data: ", trim(inflnm2)
 #endif
            CALL READFORC_WRF(inflnm2,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-                   PRES,XLONG,SHORT,PRCPnew,lai,fpar)
+                   PRES,XLONG,SHORT,PRCPnew,lai,fpar,BurnSeverity)
            CALL READFORC_WRF(inflnm,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-                   PRES,XLONG,SHORT,prcp0,lai,fpar)
+                   PRES,XLONG,SHORT,prcp0,lai,fpar,BurnSeverity)
            PRCP1=(PRCPnew-prcp0)/wrf_dt   !Adjustment to convert accum to rate...(mm/s)
            PRCP_old = PRCP1
         endif
@@ -1719,7 +1727,7 @@ Contains
  subroutine read_hydro_forcing_mpp( &
        indir,olddate,hgrid, &
        ix,jx,forc_typ,snow_assim,  &
-       T2,q2x,u,v,pres,xlong,short,prcp1,&
+       T2,q2x,u,v,pres,xlong,short,prcp1,BurnSeverity,&
        lai,fpar,snodep,dt,k,prcp_old)
 ! This subrouting is going to read different forcing.
 
@@ -1729,14 +1737,14 @@ Contains
    character(len=*) :: olddate,hgrid,indir
    character(len=256) :: filename
    integer :: ix,jx,forc_typ,k,snow_assim  ! k is time loop
-   real,dimension(ix,jx):: T2,q2x,u,v,pres,xlong,short,prcp1,&
+   real,dimension(ix,jx):: T2,q2x,u,v,pres,xlong,short,prcp1,BurnSeverity,&
           prcpnew,lai,fpar,snodep,prcp_old
    real ::  dt
    ! tmp variable
    character(len=256) :: inflnm, product
    integer  :: i,j,mmflag
    real,dimension(global_nx,global_ny):: g_T2,g_Q2X,g_U,g_V,g_XLONG, &
-             g_SHORT,g_PRCP1,g_PRES,g_lai,g_snodep,g_prcp_old, g_fpar
+             g_SHORT,g_PRCP1,g_PRES,g_lai,g_snodep,g_prcp_old,g_BurnSeverity, g_fpar
    integer flag
 
 
@@ -1750,7 +1758,7 @@ Contains
      call write_io_real(PRCP1,g_PRCP1)
      call write_io_real(PRES,g_PRES)
      call write_io_real(prcp_old,g_PRCP_old)
-
+     call write_io_real(BurnSeverity,g_BurnSeverity)
      call write_io_real(lai,g_lai)
      call write_io_real(fpar,g_fpar)
      call write_io_real(snodep,g_snodep)
@@ -1761,7 +1769,7 @@ Contains
       call read_hydro_forcing_seq( &
         indir,olddate,hgrid,&
         global_nx,global_ny,forc_typ,snow_assim,  &
-        g_T2,g_q2x,g_u,g_v,g_pres,g_xlong,g_short,g_prcp1,&
+        g_T2,g_q2x,g_u,g_v,g_pres,g_xlong,g_short,g_prcp1,g_BurnSeverity,&
         g_lai,g_fpar,g_snodep,dt,k,g_prcp_old)
 #ifdef HYDRO_D
      write(6,*) "finish read forcing,olddate ",olddate
@@ -1777,7 +1785,7 @@ Contains
      call decompose_data_real(g_PRCP1,PRCP1)
      call decompose_data_real(g_prcp_old,prcp_old)
      call decompose_data_real(g_PRES,PRES)
-
+call decompose_data_real(g_BurnSeverity,BurnSeverity)
      call decompose_data_real(g_lai,lai)
      call decompose_data_real(g_fpar,fpar)
      call decompose_data_real(g_snodep,snodep)
@@ -2252,7 +2260,7 @@ Contains
 subroutine read_hydro_forcing_mpp1( &
      indir,olddate,hgrid, &
      ix,jx,forc_typ,snow_assim,  &
-     T2,q2x,u,v,pres,xlong,short,prcp1,&
+     T2,q2x,u,v,pres,xlong,short,prcp1,BurnSeverity,&
      lai,fpar,snodep,dt,k,prcp_old)
 ! This subrouting is going to read different forcing.
 implicit none
@@ -2260,7 +2268,7 @@ implicit none
 character(len=*) :: olddate,hgrid,indir
 character(len=256) :: filename
 integer :: ix,jx,forc_typ,k,snow_assim  ! k is time loop
-real,dimension(ix,jx):: T2,q2x,u,v,pres,xlong,short,prcp1,&
+real,dimension(ix,jx):: T2,q2x,u,v,pres,xlong,short,prcp1,BurnSeverity,&
      prcpnew,weasd,snodep,prcp0,prcp2,prcp_old
 real ::  dt, wrf_dt
 ! tmp variable
@@ -2300,7 +2308,7 @@ if(FORC_TYP.eq.1) then
    print*, "read forcing data at ", OLDDATE,  trim(inflnm)
 #endif
    call READFORC_HRLDAS_mpp(inflnm,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-        PRES,XLONG,SHORT,PRCP1,LAI,FPAR)
+        PRES,XLONG,SHORT,PRCP1,BurnSeverity,LAI,FPAR)
 
    where(PRCP1 .lt. 0) PRCP1= 0  ! set minimum to be 0
    where(PRCP1 .gt. 0.138889) PRCP1= 0.138889 ! set maximum to be 500 mm/h
@@ -2326,7 +2334,7 @@ if(FORC_TYP.eq.2) then
       call hydro_stop("In read_hydro_forcing_mpp1() - no forcing data found")
    endif
    call READFORC_HRLDAS_mpp(inflnm,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-        PRES,XLONG,SHORT,PRCP1,LAI,FPAR)
+        PRES,XLONG,SHORT,PRCP1,BurnSeverity,LAI,FPAR)
 
    where(PRCP1 .lt. 0) PRCP1= 0  ! set minimum to be 0
    where(PRCP1 .gt. 0.138889) PRCP1= 0.138889 ! set maximum to be 500 mm/h
@@ -2378,9 +2386,9 @@ if(FORC_TYP.eq.3) then
 
 
    call READFORC_WRF_mpp(inflnm2,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-        PRES,XLONG,SHORT,PRCPnew,lai,fpar)
+        PRES,XLONG,SHORT,PRCPnew,lai,fpar,BurnSeverity)
    call READFORC_WRF_mpp(inflnm,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-        PRES,XLONG,SHORT,prcp0,lai,fpar)
+        PRES,XLONG,SHORT,prcp0,lai,fpar,BurnSeverity)
    PRCP1=(PRCPnew-prcp0)/wrf_dt   !Adjustment to convert accum to rate...(mm/s)
 
 end if
@@ -2540,7 +2548,7 @@ if(FORC_TYP.eq.6) then
 #endif
 
       call READFORC_HRLDAS_mpp(inflnm,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-           PRES,XLONG,SHORT,PRCP1,LAI,FPAR)
+           PRES,XLONG,SHORT,PRCP1,BurnSeverity,LAI,FPAR)
       PRCP_old = PRCP1  ! This assigns new precip to last precip as a fallback for missing data...
    endif
 
@@ -2646,9 +2654,9 @@ if(FORC_TYP.eq.7) then
       print*, "read WRF forcing data: ", trim(inflnm2)
 #endif
       call READFORC_WRF_mpp(inflnm2,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-           PRES,XLONG,SHORT,PRCPnew,lai,fpar)
+           PRES,XLONG,SHORT,PRCPnew,lai,fpar,BurnSeverity)
       call READFORC_WRF_mpp(inflnm,IX,JX,OLDDATE,T2,Q2X,U,V,   &
-           PRES,XLONG,SHORT,prcp0,lai,fpar)
+           PRES,XLONG,SHORT,prcp0,lai,fpar,BurnSeverity)
       PRCP1=(PRCPnew-prcp0)/wrf_dt   !Adjustment to convert accum to rate...(mm/s)
       PRCP_old = PRCP1
    endif
@@ -2729,7 +2737,7 @@ end subroutine read_hydro_forcing_mpp1
 
 
 
-  subroutine READFORC_HRLDAS_mpp(flnm,ix,jx,target_date, t,q,u,v,p,lw,sw,pcp,lai,fpar)
+  subroutine READFORC_HRLDAS_mpp(flnm,ix,jx,target_date, t,q,u,v,p,lw,sw,pcp,BurnSeverity,lai,fpar)
     implicit none
 
     character(len=*),                   intent(in)  :: flnm
@@ -2746,6 +2754,8 @@ end subroutine read_hydro_forcing_mpp1
     real,             dimension(ix,jx), intent(out) :: pcp
     real,             dimension(ix,jx), intent(inout) :: lai
     real,             dimension(ix,jx), intent(inout) :: fpar
+    real,             dimension(ix,jx), intent(out) :: BurnSeverity
+
 
     character(len=256) :: units
     integer :: ierr
@@ -2785,6 +2795,10 @@ end subroutine read_hydro_forcing_mpp1
     call decompose_data_real (buf2,sw)
     if(my_id .eq. io_id ) call get_2d_netcdf("RAINRATE", ncid,buf2, units, global_nx, global_ny, .TRUE., ierr)
     call decompose_data_real (buf2,pcp)
+
+    if(my_id .eq. io_id ) call get_2d_netcdf("BurnSeverity", ncid,buf2, units, global_nx, global_ny, .TRUE., ierr)
+    call decompose_data_real (buf2,BurnSeverity)
+
     if(my_id .eq. io_id ) then
           call get_2d_netcdf("VEGFRA", ncid,buf2, units, global_nx, global_ny, .FALSE., ierr)
           if (ierr == 0) then
@@ -2813,6 +2827,7 @@ end subroutine read_hydro_forcing_mpp1
     call get_2d_netcdf("SWDOWN",  ncid, sw,    units, ix, jx, .TRUE., ierr)
     call get_2d_netcdf("RAINRATE",ncid, pcp,   units, ix, jx, .TRUE., ierr)
     call get_2d_netcdf("VEGFRA",  ncid, fpar,  units, ix, jx, .FALSE., ierr)
+    call get_2d_netcdf("BurnSeverity",  ncid, BurnSeverity,  units, ix, jx, .FALSE., ierr)
 
     if (ierr == 0) then
       if(maxval(fpar) .gt. 10 .and. maxval(fpar) .lt. 10000)  fpar = fpar * 1.E-2
@@ -2824,14 +2839,14 @@ end subroutine read_hydro_forcing_mpp1
 
   end subroutine READFORC_HRLDAS_mpp
 
-  subroutine READFORC_WRF_mpp(flnm,ix,jx,target_date,t,q,u,v,p,lw,sw,pcp,lai,fpar)
+  subroutine READFORC_WRF_mpp(flnm,ix,jx,target_date,t,q,u,v,p,lw,sw,pcp,lai,fpar,BurnSeverity)
 
     implicit none
     character(len=*),                   intent(in)  :: flnm
     integer,                            intent(in)  :: ix
     integer,                            intent(in)  :: jx
     character(len=*),                   intent(in)  :: target_date
-    real,             dimension(ix,jx) :: t,q,u,v,p,lw,sw,pcp,pcpc, lai,fpar
+    real,             dimension(ix,jx) :: t,q,u,v,p,lw,sw,pcp,pcpc, lai,fpar,BurnSeverity
     integer   tlevel
 
     character(len=256) :: units
@@ -2880,6 +2895,10 @@ end subroutine read_hydro_forcing_mpp1
     call decompose_data_real (buf2,pcp)
     if(my_id .eq. io_id) call get_2d_netcdf_ruc("LAI",     ncid, buf2, global_nx, global_ny,tlevel, .false., ierr)
     call mpp_land_bcast_int1(ierr)
+    if(my_id .eq. io_id) call get_2d_netcdf_ruc("BurnSeverity",     ncid, buf2, global_nx, global_ny,tlevel, .true., ierr)
+    call decompose_data_real (buf2,BurnSeverity)
+
+
     if(ierr == 0) call decompose_data_real (buf2,lai)
     if(my_id .eq. io_id) then
        call get_2d_netcdf_ruc("VEGFRA", ncid, buf2, global_nx, global_ny, tlevel, .true., ierr)
@@ -2908,6 +2927,7 @@ end subroutine read_hydro_forcing_mpp1
     call get_2d_netcdf_ruc("RAINC",  ncid, pcpc,  ix, jx,tlevel, .true., ierr)
     call get_2d_netcdf_ruc("RAINNC", ncid, pcp,   ix, jx,tlevel, .true., ierr)
     call get_2d_netcdf_ruc("VEGFRA", ncid, fpar,  ix, jx,tlevel, .false., ierr)
+    call get_2d_netcdf_ruc("BurnSeverity", ncid, BurnSeverity,  ix, jx,tlevel, .false., ierr)
     if(ierr == 0) then
         if(maxval(fpar) .gt. 10 .and. (maxval(fpar) .lt. 10000) ) fpar = fpar * 0.01
     endif
@@ -3320,4 +3340,3 @@ end module module_lsm_forcing
       real, dimension(ix,jx):: infxsrt,soldrain
       call read_ldasout_seq(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain)
     end subroutine read_forc_ldasout_seq
-

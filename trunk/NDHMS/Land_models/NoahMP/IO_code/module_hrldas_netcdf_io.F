@@ -50,6 +50,7 @@ module module_hrldas_netcdf_io
      real, pointer, dimension(:,:) :: pcp
      real, pointer, dimension(:,:) :: vegfra
      real, pointer, dimension(:,:) :: lai
+     real, pointer, dimension(:,:) :: BurnSeverity
   end type inputstruct
 
   character(len=256), private :: restart_filename_remember
@@ -1872,7 +1873,7 @@ contains
 !---------------------------------------------------------------------------------------------------------
 
   subroutine READFORC_HRLDAS(flnm_template, forcing_timestep, target_date, xstart, xend, ystart, yend,  &
-       t,q,u,v,p,lw,sw,pcp,vegfra,update_veg,lai,update_lai)
+       t,q,u,v,p,lw,sw,pcp,BurnSeverity,vegfra,update_veg,lai,update_lai)
     use kwm_string_utilities
     implicit none
 
@@ -1889,8 +1890,10 @@ contains
     real,             dimension(xstart:xend,ystart:yend), intent(out)   :: lw
     real,             dimension(xstart:xend,ystart:yend), intent(out)   :: sw
     real,             dimension(xstart:xend,ystart:yend), intent(out)   :: pcp
+    real,             dimension(xstart:xend,ystart:yend), intent(out) :: BurnSeverity
     real,             dimension(xstart:xend,ystart:yend), intent(inout) :: lai    !Barlage v3.7: change to inout
     real,             dimension(xstart:xend,ystart:yend), intent(inout) :: vegfra
+    
     logical,                            intent(in)  :: update_veg, update_lai  ! Barlage v3.7: for veg read control
 
     character(len=256) :: flnm
@@ -1901,9 +1904,9 @@ contains
     integer :: rank
 
     type(inputstruct) :: lastread = inputstruct("0000-00-00_00:00:00", &
-         null(), null(), null(), null(), null(), null(), null(), null(), null(), null() )
+         null(), null(), null(), null(), null(), null(), null(), null(), null(), null(),null() )
     type(inputstruct) :: nextread= inputstruct("0000-00-00_00:00:00", &
-         null(), null(), null(), null(), null(), null(), null(), null(), null(), null() )
+         null(), null(), null(), null(), null(), null(), null(), null(), null(), null(),null() )
 
 !KWM    print*, 'target_date        = ', target_date
 !KWM    print*, 'lastread%read_date = ', lastread%read_date
@@ -1992,6 +1995,7 @@ contains
        call get_2d_netcdf("LWDOWN",  ncid, nextread%lw,    units, xstart, xend, ystart, yend, FATAL, ierr)
        call get_2d_netcdf("SWDOWN",  ncid, nextread%sw,    units, xstart, xend, ystart, yend, FATAL, ierr)
        call get_2d_netcdf("RAINRATE",ncid, nextread%pcp,   units, xstart, xend, ystart, yend, FATAL, ierr)
+       call get_2d_netcdf("BurnSeverity",ncid, nextread%BurnSeverity,   units, xstart, xend, ystart, yend, FATAL, ierr)
 
        if(update_veg) then    ! Barlage v3.7: update only if dveg option is appropriate
 
@@ -2045,7 +2049,7 @@ contains
        !
 
        ! Fill the t, q, u, v, ... arrays with data from the nextread structure.
-       call copyfrom_inputstruct(nextread, t, q, u, v, p, lw, sw, pcp, vegfra, lai, &
+       call copyfrom_inputstruct(nextread, t, q, u, v, p, lw, sw, pcp,vegfra, lai,BurnSeverity, &
                                  update_veg, update_lai, xstart, xend, ystart, yend)
 
        ! Clear the old lastread data
@@ -2070,7 +2074,7 @@ contains
 
        ! Fill the t, q, u, v, ... arrays with data interpolated between lastread and nextread times.
        call interpolate_inputstruct(lastread, nextread, target_date, &
-            t, q, u, v, p, lw, sw, pcp, vegfra, lai, update_veg, update_lai, xstart, xend, ystart, yend)
+            t, q, u, v, p, lw, sw, pcp, vegfra, lai, BurnSeverity,update_veg, update_lai, xstart, xend, ystart, yend)
 
     else
 
@@ -2126,6 +2130,11 @@ contains
 
     allocate(instruct%lai (xstart:xend,ystart:yend), stat=allostat )
     if (allostat/=0) stop "FATAL ERROR: In allocate_inputstruct() - Problem allocating instruct%lai"
+
+    allocate(instruct%BurnSeverity (xstart:xend,ystart:yend), stat=allostat )
+    if (allostat/=0) stop "FATAL ERROR: In allocate_inputstruct() - Problem allocating instruct%BurnSeverity"
+
+
 #ifdef MPP_LAND
     instruct%lai = 0.0
 #endif
@@ -2134,13 +2143,13 @@ contains
 !---------------------------------------------------------------------------------------------------------
 !---------------------------------------------------------------------------------------------------------
 
-  subroutine copyfrom_inputstruct(instruct, t, q, u, v, p, lw, sw, pcp, vegfra, lai, &
+  subroutine copyfrom_inputstruct(instruct, t, q, u, v, p, lw, sw, pcp,vegfra, lai, BurnSeverity,&
                                   update_veg, update_lai, xstart, xend, ystart, yend)
     implicit none
     type(inputstruct), intent(in) :: instruct
     integer,           intent(in) :: xstart, xend, ystart, yend
     logical,           intent(in)  :: update_veg, update_lai  ! Barlage v3.7: for veg read control
-    real, dimension(xstart:xend,ystart:yend), intent(out) :: t, q, u, v, p, lw, sw, pcp, vegfra, lai
+    real, dimension(xstart:xend,ystart:yend), intent(out) :: t, q, u, v, p, lw, sw, pcp,vegfra, lai,BurnSeverity
     t    = instruct%t
     q    = instruct%q
     u    = instruct%u
@@ -2149,6 +2158,7 @@ contains
     lw   = instruct%lw
     sw   = instruct%sw
     pcp  = instruct%pcp
+    BurnSeverity=instruct%BurnSeverity
     if(update_veg) vegfra = instruct%vegfra
     if(update_lai)   lai  = instruct%lai
   end subroutine copyfrom_inputstruct
@@ -2157,13 +2167,13 @@ contains
 !---------------------------------------------------------------------------------------------------------
 
   subroutine interpolate_inputstruct(instructA, instructB, target_date, &
-       t, q, u, v, p, lw, sw, pcp, vegfra, lai, update_veg, update_lai, xstart, xend, ystart, yend)
+       t, q, u, v, p, lw, sw, pcp,vegfra, lai,BurnSeverity, update_veg, update_lai, xstart, xend, ystart, yend)
     implicit none
     type(inputstruct),                        intent(in)  :: instructA, instructB
     character(len=19),                        intent(in)  :: target_date
     integer,                                  intent(in)  :: xstart, xend, ystart, yend
     logical,                                  intent(in)  :: update_veg, update_lai  ! Barlage v3.7: for veg read control
-    real, dimension(xstart:xend,ystart:yend), intent(out) :: t, q, u, v, p, lw, sw, pcp, vegfra, lai
+    real, dimension(xstart:xend,ystart:yend), intent(out) :: t, q, u, v, p, lw, sw, pcp,vegfra, lai,BurnSeverity
 
     integer :: idts, idts2
     real    :: fraction
@@ -2179,7 +2189,9 @@ contains
     p  = ( instructA%p  * fraction ) + ( instructB%p  * (1.0-fraction) )
     lw = ( instructA%lw * fraction ) + ( instructB%lw * (1.0-fraction) )
     sw = ( instructA%sw * fraction ) + ( instructB%sw * (1.0-fraction) )
+    BurnSeverity = instructA%BurnSeverity
     pcp = instructA%pcp
+    
     if(update_veg) vegfra = instructA%vegfra
     if(update_lai)   lai  = instructA%lai
   end subroutine interpolate_inputstruct
@@ -2240,6 +2252,15 @@ contains
        deallocate(instruct%lai)
        nullify(instruct%lai)
     endif
+
+    !Added by Ronnie:
+    if (associated(instruct%BurnSeverity)) then
+        deallocate(instruct%BurnSeverity)
+        nullify(instruct%BurnSeverity)
+    endif
+    
+
+
   end subroutine clear_inputstruct
 
 !---------------------------------------------------------------------------------------------------------
@@ -2259,6 +2280,8 @@ contains
     nullify(instruct%pcp)
     nullify(instruct%vegfra)
     nullify(instruct%lai)
+    nullify(instruct%BurnSeverity)
+
   end subroutine nullify_inputstruct
 
 !---------------------------------------------------------------------------------------------------------

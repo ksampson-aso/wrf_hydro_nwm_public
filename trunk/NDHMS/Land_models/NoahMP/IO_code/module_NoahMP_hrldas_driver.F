@@ -144,6 +144,9 @@ module module_NoahMP_hrldas_driver
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  GRAUPELNCV! non-convective graupel forcing (subset of rainncv) [mm]
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  HAILNCV   ! non-convective hail forcing (subset of rainncv) [mm]
 
+!Added by Ronnie:
+ REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  BurnSeverity    ! Burn severity
+
 ! New spatially varying fields
 
   CHARACTER(LEN = 256)                    ::  spatial_filename
@@ -771,6 +774,9 @@ module module_NoahMP_hrldas_driver
   ALLOCATE ( GRAUPELNCV(XSTART:XEND,YSTART:YEND) )    ! non-convective graupel forcing (subset of rainncv) [mm]
   ALLOCATE ( HAILNCV   (XSTART:XEND,YSTART:YEND) )    ! non-convective hail forcing (subset of rainncv) [mm]
 
+!Added by Ronnie
+  ALLOCATE ( BurnSeverity    (XSTART:XEND,YSTART:YEND) )    ! BurnSeverity
+
 #ifdef SPATIAL_SOIL
   ALLOCATE ( bexp_3d    (XSTART:XEND,1:NSOIL,YSTART:YEND) )    ! C-H B exponent
   ALLOCATE ( smcdry_3D  (XSTART:XEND,1:NSOIL,YSTART:YEND) )    ! Soil Moisture Limit: Dry
@@ -1003,6 +1009,11 @@ module module_NoahMP_hrldas_driver
   V_PHY      = undefined_real
   SWDOWN     = undefined_real
   GLW        = undefined_real
+
+!Added by Ronnie
+  BurnSeverity     = undefined_real
+
+
   P8W        = undefined_real
   RAINBL     = undefined_real
   RAINBL_tmp = undefined_real
@@ -1573,7 +1584,7 @@ endif
                   'CHV2,CHB2,LFMASS,RTMASS,STMASS,WOOD,STBLCP,FASTCP,NEE,GPP,NPP,PSN,APAR,ACCET,CANWAT,SOILICE,SOILSAT_TOP,'// &
                   'SOILSAT,SNOWT_AVG,QRAIN,glacier,glacier_thickness,PSNOWALB,PSNOWTHRUFAL,PSNOWHEIGHT,PSNOWTOTSWE,'// &
                   'PSNOWGRAN1,PSNOWGRAN2,PSNOWAGE,PSNOWTEMP,PSNOWDZ,PSNOWHIST,PSNOWLIQ,PSNOWHEAT,PSNOWRHO,PSNOWSWE,'// &
-                  'FLOW_ICE,FLOW_SNOW'
+                  'FLOW_ICE,FLOW_SNOW,BURNSEVERITY'
 
    endif
    if (io_config_outputs .eq. 1) then
@@ -1725,13 +1736,13 @@ end subroutine land_driver_ini
         CALL READFORC_HRLDAS(INFLNM_TEMPLATE, noah_lsm%FORCING_TIMESTEP, OLDDATE,  &
              XSTART, XEND, YSTART, YEND,                                  &
              T_PHY(:,1,:),QV_CURR(:,1,:),U_PHY(:,1,:),V_PHY(:,1,:),          &
-	       P8W(:,1,:), GLW       ,SWDOWN      ,RAINBL_tmp, VEGFRA, update_veg, LAI, update_lai)
+	       P8W(:,1,:), GLW       ,SWDOWN      ,RAINBL_tmp, BurnSeverity,VEGFRA, update_veg, LAI, update_lai)
      else
         if(olddate == forcDate) then
            CALL HYDRO_frocing_drv(trim(noah_lsm%indir), forc_typ, wrf_hydro%snow_assim,olddate,                      &
                xstart, xend, ystart, yend,    &
                T_PHY(:,1,:),QV_CURR(:,1,:),U_PHY(:,1,:),V_PHY(:,1,:),P8W(:,1,:),    &
-               GLW,SWDOWN,RAINBL_tmp,LAI,VEGFRA,state%SNOWH,ITIME,noah_lsm%FORCING_TIMESTEP,prcp0)
+               GLW,SWDOWN,RAINBL_tmp,BurnSeverity,LAI,VEGFRA,state%SNOWH,ITIME,noah_lsm%FORCING_TIMESTEP,prcp0)
 
                if(maxval(VEGFRA) .le. 1)  VEGFRA = VEGFRA * 100
 
@@ -1744,7 +1755,7 @@ end subroutine land_driver_ini
      CALL READFORC_HRLDAS(INFLNM_TEMPLATE, noah_lsm%FORCING_TIMESTEP, OLDDATE,  &
           XSTART, XEND, YSTART, YEND,                                  &
           T_PHY(:,1,:),QV_CURR(:,1,:),U_PHY(:,1,:),V_PHY(:,1,:),          &
-	    P8W(:,1,:), GLW       ,SWDOWN      ,RAINBL_tmp, VEGFRA, update_veg, LAI, update_lai)
+	    P8W(:,1,:), GLW       ,SWDOWN      ,RAINBL_tmp, BurnSeverity,VEGFRA, update_veg, LAI, update_lai)
 #endif
 
 991  continue
@@ -1757,6 +1768,9 @@ end subroutine land_driver_ini
      where(XLAND > 1.5)     GLW        = 0.0
      where(XLAND > 1.5)  SWDOWN        = 0.0
      where(XLAND > 1.5) RAINBL_tmp     = 0.0
+
+!Added by Ronnie
+    where(XLAND > 1.5)  BurnSeverity        = 0.0
 
      QV_CURR(:,1,:) = QV_CURR(:,1,:)/(1.0 - QV_CURR(:,1,:))  ! Assuming input forcing are specific hum.;
                                                              ! WRF wants mixing ratio at driver level
@@ -1828,7 +1842,7 @@ end subroutine land_driver_ini
 	       IOPT_INF, IOPT_RAD, IOPT_ALB, IOPT_SNF, IOPT_TBOT,   IOPT_STC, &
 	       IOPT_GLA, IOPT_RSF,IOPT_SOIL,IOPT_PEDO, IOPT_CROP,             &
                IOPT_IMPERV, IZ0TLND,                                          &
-		  T_PHY,  QV_CURR,    U_PHY,    V_PHY,    SWDOWN,        GLW, &
+		  T_PHY,  QV_CURR,    U_PHY,    V_PHY,    SWDOWN,        GLW, BurnSeverity,&
 		    P8W,   RAINBL,       SR,                                  &
 		    TSK,      HFX,      QFX,       LH,    GRDFLX,     SMSTAV, &
 		 SMSTOT,SFCRUNOFF, UDRUNOFF,   ALBEDO,     SNOWC,      SMOIS, &
@@ -2013,6 +2027,9 @@ subroutine  ldas_output(itime, state)
 !              call add_to_output(COSZEN     , "COSZ"    , "Cosine of zenith angle"                    , "W m{-2}"               )
 !              call add_to_output(GLW        , "LWFORC"  , "Longwave forcing"                    , "W m{-2}"               )
 !              call add_to_output(RAINBL     , "RAINRATE", "Precipitation rate"                   , "kg m{-2} s{-1}"        )
+!Added by Ronnie
+!              call add_to_output(BurnSeverity     , "BurnSeverity"  , "BurnSeverity"                    , "category"               )
+
 !        ! Grid energy budget terms
 !              call add_to_output(EMISS      , "EMISS"   , "Grid emissivity"                    , ""               )
 !              call add_to_output(FSAXY      , "FSA"     , "Total absorbed SW radiation"          , "W m{-2}"               )
@@ -2242,6 +2259,7 @@ subroutine  ldas_output(itime, state)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,noah_lsm%act_lev,PSNOWSWEXY,IVGTYP,114)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,FLOW_ICE,IVGTYP,115)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,FLOW_SNOW,IVGTYP,116)
+   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,BurnSeverity,IVGTYP,117)
    end if ! crocus_opt /= 0
 #endif /* WRF_HYDRO */
 

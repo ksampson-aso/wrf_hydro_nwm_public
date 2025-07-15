@@ -525,15 +525,16 @@ use module_RT_data, only: rt_domain  !! JLM: this is only used in a c3 paramter 
 
       qloss = (ChannK * dx * WPk) ! TML -- Compute qloss to pass
 
-      !TML:Added print statement to test qlos function;
-      !comment out to prevent excessive file sizes when running model
-      !print*, "qloss,dx,WP,WPk,depth,ChannK,qdc,ql,dt,D", qloss,dx,WP,WPk,depth,ChannK,qdc,ql,dt,D
-      if((qloss*dt)/D > ((ql*dt)/D - C4)) then
-           qloss = ql - C4*(D/dt)
-           if (qloss < 0) then
-              print*, 'WARNING CHANNEL LOSS IS NEGATIVE',qloss
-           endif
-      endif
+      ! Logan Change - This is completely IO expensive.....
+      !!TML:Added print statement to test qlos function;
+      !!comment out to prevent excessive file sizes when running model
+      !!print*, "qloss,dx,WP,WPk,depth,ChannK,qdc,ql,dt,D", qloss,dx,WP,WPk,depth,ChannK,qdc,ql,dt,D
+      !if((qloss*dt)/D > ((ql*dt)/D - C4)) then
+      !     qloss = ql - C4*(D/dt)
+      !     if (qloss < 0) then
+      !        print*, 'WARNING CHANNEL LOSS IS NEGATIVE',qloss
+      !     endif
+      !endif
 
 ! ----------------------------------------------------------------
 END SUBROUTINE SUBMUSKINGCUNGE
