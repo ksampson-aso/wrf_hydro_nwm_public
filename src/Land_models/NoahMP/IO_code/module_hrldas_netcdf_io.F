@@ -1,23 +1,3 @@
-!  Program Name:
-!  Author(s)/Contact(s):
-!  Abstract:
-!  History Log:
-!
-!  Usage:
-!  Parameters: <Specify typical arguments passed>
-!  Input Files:
-!        <list file names and briefly describe the data they include>
-!  Output Files:
-!        <list file names and briefly describe the information they include>
-!
-!  Condition codes:
-!        <list exit condition or error codes returned >
-!        If appropriate, descriptive troubleshooting instructions or
-!        likely causes for failures could be mentioned here with the
-!        appropriate error code
-!
-!  User controllable options: <if applicable>
-
 module module_hrldas_netcdf_io
   use module_date_utilities
   use netcdf
@@ -48,8 +28,10 @@ module module_hrldas_netcdf_io
      real, pointer, dimension(:,:) :: lw
      real, pointer, dimension(:,:) :: sw
      real, pointer, dimension(:,:) :: pcp
+     real, pointer, dimension(:,:) :: snow
      real, pointer, dimension(:,:) :: vegfra
      real, pointer, dimension(:,:) :: lai
+     !Added: burn severity forcing (post-fire snow albedo perturbation)
      real, pointer, dimension(:,:) :: BurnSeverity
   end type inputstruct
 
@@ -431,15 +413,15 @@ contains
     real, pointer,   dimension(:,:)   :: dum2d_ptr
 #endif
     integer, volatile :: ncid, dimid, varid, ierr
-    real, allocatable, dimension(:,:) :: dum2d
+    real, allocatable, dimension(:,:), volatile :: dum2d
     character(len=256) :: units
     integer :: i
     integer :: rank
 
 #ifdef _PARALLEL_
-    call MPI_COMM_RANK(HYDRO_COMM_WORLD, rank, ierr)
+    call MPI_Comm_rank(HYDRO_COMM_WORLD, rank, ierr)
     if (ierr /= MPI_SUCCESS) stop "FATAL ERROR: In module_hrldas_netcdf_io.F "// &
-                                  "read_hrldas_hdrinfo() - MPI_COMM_RANK"
+                                  "read_hrldas_hdrinfo() - MPI_Comm_rank"
 #else
     rank = 0
 #endif
@@ -606,8 +588,8 @@ contains
     real,    dimension(xstart:xend,ystart:yend), intent(out) :: seaice
     real,    dimension(xstart:xend,ystart:yend), intent(out) :: msftx
     real,    dimension(xstart:xend,ystart:yend), intent(out) :: msfty
-    real,    dimension(xstart:xend,ystart:yend), intent(out), optional :: glact
-    real,    dimension(xstart:xend,ystart:yend), intent(out), optional :: vis_icealb
+    real,    dimension(:,:), intent(inout), allocatable :: glact
+    real,    dimension(:,:), intent(inout), allocatable :: vis_icealb
 
     character(len=256) :: units
     integer :: ierr
@@ -618,9 +600,9 @@ contains
     crocus_opt = local_crocus_opt ! setting module scope variable
 
 #ifdef _PARALLEL_
-    call MPI_COMM_RANK(HYDRO_COMM_WORLD, rank, ierr)
+    call MPI_Comm_rank(HYDRO_COMM_WORLD, rank, ierr)
     if (ierr /= MPI_SUCCESS) stop "FATAL ERROR: In module_hrldas_netcdf_io.F readland_hrldas()"// &
-                                  " - MPI_COMM_RANK"
+                                  " - MPI_Comm_rank"
 #else
     rank = 0
 #endif
@@ -640,8 +622,8 @@ contains
     if (ierr /= 0) then
        write(*,'("READLAND_HRLDAS:  Problem opening wrfinput file: ''", A, "''")') trim(wrfinput_flnm)
 #ifdef _PARALLEL_
-       call mpi_finalize(ierr)
-       if (ierr /= 0) write(*, '("Problem with MPI_finalize.")')
+       call MPI_Finalize(ierr)
+       if (ierr /= 0) write(*, '("Problem with MPI_Finalize.")')
 #endif
        stop "FATAL ERROR: In module_hrldas_netcdf_io.F readland_hrldas()"// &
             " - Problem opening wrfinput file."
@@ -699,6 +681,8 @@ contains
           stop "FATAL ERROR: In module_hrldas_netcdf_io.F readland_hrldas()"// &
                " - crocus_opt on but netcdf read of glacinfo returned non-zero"
        end if
+
+       if (allocated(glact) .eqv. .false.) error stop "FATAL ERROR: glact not initialized but crocus is on"
        ! Get Glacier thickness (glact)
        call get_2d_netcdf("glacier_thickness", ncid, glact,   units, xstart, xend, ystart, yend, NOT_FATAL, ierr)
        if (ierr /= 0) then
@@ -707,6 +691,7 @@ contains
                ". Setting glacier thickness to 0.0"
        end if
 
+       if (allocated(vis_icealb) .eqv. .false.) error stop "FATAL ERROR: vis_icealb not initialized but crocus is on"
        ! Get visible ice albedo map (vis_icealb)
        call get_2d_netcdf("min_vis", ncid, vis_icealb,   units, xstart, xend, ystart, yend, NOT_FATAL, ierr)
        if (ierr /= 0) then
@@ -757,9 +742,9 @@ contains
     integer :: rank
 
 #ifdef _PARALLEL_
-    call MPI_COMM_RANK(HYDRO_COMM_WORLD, rank, ierr)
+    call MPI_Comm_rank(HYDRO_COMM_WORLD, rank, ierr)
     if (ierr /= MPI_SUCCESS) stop "FATAL ERROR: In module_hrldas_netcdf_io.F read_mmf_runoff()"// &
-                                  " - MPI_COMM_RANK"
+                                  " - MPI_Comm_rank"
 #else
     rank = 0
 #endif
@@ -779,8 +764,8 @@ contains
     if (ierr /= 0) then
        write(*,'("read_mmf_runoff:  Problem opening wrfinput file: ''", A, "''")') trim(wrfinput_flnm)
 #ifdef _PARALLEL_
-       call mpi_finalize(ierr)
-       if (ierr /= 0) write(*, '("Problem with MPI_finalize.")')
+       call MPI_Finalize(ierr)
+       if (ierr /= 0) write(*, '("Problem with MPI_Finalize.")')
 #endif
        stop "FATAL ERROR: In module_hrldas_netcdf_io.F read_mmf_runoff()"// &
             " - Problem opening wrfinput file."
@@ -1320,7 +1305,7 @@ contains
     integer, intent(in) :: ncid
     integer, intent(in) :: xstart, xend, ystart, yend
 #ifdef MPP_LAND
-    real, dimension(xstart:xend,ystart:yend), intent(inout) :: array
+    real, dimension(:,:), intent(inout) :: array
 #else
     real, dimension(xstart:xend,ystart:yend), intent(out) :: array
 #endif
@@ -1332,7 +1317,7 @@ contains
     logical, intent(in) :: fatal_if_error
     integer, intent(out), volatile :: ierr
 #ifdef MPP_LAND
-    real:: g_array(global_nx,global_ny)
+    real, volatile :: g_array(global_nx,global_ny)
 #endif
 
     ierr = 0
@@ -1530,9 +1515,9 @@ contains
 
 #ifdef _PARALLEL_
 
-    call MPI_COMM_RANK(HYDRO_COMM_WORLD, rank, ierr)
+    call MPI_Comm_rank(HYDRO_COMM_WORLD, rank, ierr)
     if (ierr /= MPI_SUCCESS) stop "FATAL ERROR: In  module_hrldas_netcdf_io.F"// &
-                                  " readinit_hrldas() - MPI_COMM_RANK"
+                                  " readinit_hrldas() - MPI_Comm_rank"
 
     ierr = nf90_open_par(netcdf_flnm, NF90_NOWRITE, HYDRO_COMM_WORLD, MPI_INFO_NULL, ncid)
 #else
@@ -1551,7 +1536,7 @@ contains
 #endif
        endif
 #ifdef _PARALLEL_
-       call mpi_finalize(ierr)
+       call MPI_Finalize(ierr)
 #endif
        stop "FATAL ERROR: In  module_hrldas_netcdf_io.F readinit_hrldas()"// &
             " - Problem opening netcdf file."
@@ -1675,9 +1660,9 @@ contains
     integer :: rank
 
 #ifdef _PARALLEL_
-    call MPI_COMM_RANK(HYDRO_COMM_WORLD, rank, ierr)
+    call MPI_Comm_rank(HYDRO_COMM_WORLD, rank, ierr)
     if (ierr /= MPI_SUCCESS) stop "FATAL ERROR: In  module_hrldas_netcdf_io.F init_interp()"// &
-                                  " - MPI_COMM_RANK."
+                                  " - MPI_Comm_rank."
 #else
     rank = 0
 #endif
@@ -1873,7 +1858,9 @@ contains
 !---------------------------------------------------------------------------------------------------------
 
   subroutine READFORC_HRLDAS(flnm_template, forcing_timestep, target_date, xstart, xend, ystart, yend,  &
-       t,q,u,v,p,lw,sw,pcp,BurnSeverity,vegfra,update_veg,lai,update_lai)
+       forcing_name_T,forcing_name_Q,forcing_name_U,forcing_name_V,forcing_name_P, &
+       forcing_name_LW,forcing_name_SW,forcing_name_PR,forcing_name_SN, forcing_name_LF,&
+       t,q,u,v,p,lw,sw,pcp,snow,vegfra,update_veg,lai,update_lai,BurnSeverity)
     use kwm_string_utilities
     implicit none
 
@@ -1882,6 +1869,17 @@ contains
     integer,                            intent(in)  :: xstart, xend
     integer,                            intent(in)  :: ystart, yend
     character(len=19),                  intent(in)  :: target_date ! (YYYY-MM-DD_hh:mm:ss)
+    character(len=256),                 intent(in)  :: forcing_name_T
+    character(len=256),                 intent(in)  :: forcing_name_Q
+    character(len=256),                 intent(in)  :: forcing_name_U
+    character(len=256),                 intent(in)  :: forcing_name_V
+    character(len=256),                 intent(in)  :: forcing_name_P
+    character(len=256),                 intent(in)  :: forcing_name_LW
+    character(len=256),                 intent(in)  :: forcing_name_SW
+    character(len=256),                 intent(in)  :: forcing_name_PR
+    character(len=256),                 intent(in)  :: forcing_name_SN
+    character(len=256),                 intent(in)  :: forcing_name_LF
+
     real,             dimension(xstart:xend,ystart:yend), intent(out)   :: t
     real,             dimension(xstart:xend,ystart:yend), intent(out)   :: q
     real,             dimension(xstart:xend,ystart:yend), intent(out)   :: u
@@ -1890,11 +1888,15 @@ contains
     real,             dimension(xstart:xend,ystart:yend), intent(out)   :: lw
     real,             dimension(xstart:xend,ystart:yend), intent(out)   :: sw
     real,             dimension(xstart:xend,ystart:yend), intent(out)   :: pcp
-    real,             dimension(xstart:xend,ystart:yend), intent(out) :: BurnSeverity
+    real,             dimension(xstart:xend,ystart:yend), intent(out)   :: snow
     real,             dimension(xstart:xend,ystart:yend), intent(inout) :: lai    !Barlage v3.7: change to inout
     real,             dimension(xstart:xend,ystart:yend), intent(inout) :: vegfra
-    
     logical,                            intent(in)  :: update_veg, update_lai  ! Barlage v3.7: for veg read control
+    !Added: burn severity forcing (post-fire snow albedo perturbation)
+    real,             dimension(xstart:xend,ystart:yend), intent(out)   :: BurnSeverity
+
+    real,             dimension(xstart:xend,ystart:yend)                :: liqfrac
+    logical :: snow_read = .false.
 
     character(len=256) :: flnm
     character(len=256) :: units
@@ -1904,9 +1906,9 @@ contains
     integer :: rank
 
     type(inputstruct) :: lastread = inputstruct("0000-00-00_00:00:00", &
-         null(), null(), null(), null(), null(), null(), null(), null(), null(), null(),null() )
+         null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null())
     type(inputstruct) :: nextread= inputstruct("0000-00-00_00:00:00", &
-         null(), null(), null(), null(), null(), null(), null(), null(), null(), null(),null() )
+         null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null())
 
 !KWM    print*, 'target_date        = ', target_date
 !KWM    print*, 'lastread%read_date = ', lastread%read_date
@@ -1966,15 +1968,15 @@ contains
 #endif
        if (ierr /= 0) then
 #ifdef _PARALLEL_
-          call MPI_COMM_RANK(HYDRO_COMM_WORLD, rank, ierr)
+          call MPI_Comm_rank(HYDRO_COMM_WORLD, rank, ierr)
           if (ierr /= MPI_SUCCESS) stop "FATAL ERROR: In  module_hrldas_netcdf_io.F"// &
-                                        " READFORC_HRLDAS() - MPI_COMM_RANK"
+                                        " READFORC_HRLDAS() - MPI_Comm_rank"
           if (rank == 0) then
 #endif
              write(*,'("A)  Problem opening netcdf file: ''", A, "''")') trim(flnm)
 #ifdef _PARALLEL_
           endif
-          call mpi_finalize(ierr)
+          call MPI_Finalize(ierr)
 #endif
           stop  "FATAL ERROR: In  module_hrldas_netcdf_io.F READFORC_HRLDAS()"// &
                 " - Problem opening netcdf file"
@@ -1987,15 +1989,31 @@ contains
        call allocate_inputstruct(nextread, xstart, xend, ystart, yend)
 
        ! Read the data
-       call get_2d_netcdf("T2D",     ncid, nextread%t,     units, xstart, xend, ystart, yend, FATAL, ierr)
-       call get_2d_netcdf("Q2D",     ncid, nextread%q,     units, xstart, xend, ystart, yend, FATAL, ierr)
-       call get_2d_netcdf("U2D",     ncid, nextread%u,     units, xstart, xend, ystart, yend, FATAL, ierr)
-       call get_2d_netcdf("V2D",     ncid, nextread%v,     units, xstart, xend, ystart, yend, FATAL, ierr)
-       call get_2d_netcdf("PSFC",    ncid, nextread%p,     units, xstart, xend, ystart, yend, FATAL, ierr)
-       call get_2d_netcdf("LWDOWN",  ncid, nextread%lw,    units, xstart, xend, ystart, yend, FATAL, ierr)
-       call get_2d_netcdf("SWDOWN",  ncid, nextread%sw,    units, xstart, xend, ystart, yend, FATAL, ierr)
-       call get_2d_netcdf("RAINRATE",ncid, nextread%pcp,   units, xstart, xend, ystart, yend, FATAL, ierr)
-       call get_2d_netcdf("BurnSeverity",ncid, nextread%BurnSeverity,   units, xstart, xend, ystart, yend, FATAL, ierr)
+       call get_2d_netcdf(trim(forcing_name_T) , ncid, nextread%t,     units, xstart, xend, ystart, yend, FATAL, ierr)
+       call get_2d_netcdf(trim(forcing_name_Q) , ncid, nextread%q,     units, xstart, xend, ystart, yend, FATAL, ierr)
+       call get_2d_netcdf(trim(forcing_name_U) , ncid, nextread%u,     units, xstart, xend, ystart, yend, FATAL, ierr)
+       call get_2d_netcdf(trim(forcing_name_V) , ncid, nextread%v,     units, xstart, xend, ystart, yend, FATAL, ierr)
+       call get_2d_netcdf(trim(forcing_name_P) , ncid, nextread%p,     units, xstart, xend, ystart, yend, FATAL, ierr)
+       call get_2d_netcdf(trim(forcing_name_LW), ncid, nextread%lw,    units, xstart, xend, ystart, yend, FATAL, ierr)
+       call get_2d_netcdf(trim(forcing_name_SW), ncid, nextread%sw,    units, xstart, xend, ystart, yend, FATAL, ierr)
+       call get_2d_netcdf(trim(forcing_name_PR), ncid, nextread%pcp,   units, xstart, xend, ystart, yend, FATAL, ierr)
+
+       nextread%snow = 0.0  ! Assume zero in case not present
+       if(trim(forcing_name_SN) /= "") then
+         call get_2d_netcdf(trim(forcing_name_SN), ncid, nextread%snow,  units, xstart, xend, ystart, yend, NOT_FATAL, ierr)
+         if(ierr == 0) snow_read = .true.
+       end if
+
+       if(trim(forcing_name_LF) /= "" .and. .not. snow_read) then   ! snow was not read in
+         liqfrac = 1.0            ! Assume all liquid in case not present
+         call get_2d_netcdf(trim(forcing_name_LF), ncid, liqfrac,  units, xstart, xend, ystart, yend, NOT_FATAL, ierr)
+         if (ierr == 0) nextread%snow = (1.0 - liqfrac ) * nextread%pcp
+       end if
+
+       !Added: burn severity forcing. Not fatal if absent - default to 0 (unburned)
+       !so forcing datasets without this field, and idealized forcing, still run.
+       nextread%BurnSeverity = 0.0
+       call get_2d_netcdf("BurnSeverity", ncid, nextread%BurnSeverity, units, xstart, xend, ystart, yend, NOT_FATAL, ierr)
 
        if(update_veg) then    ! Barlage v3.7: update only if dveg option is appropriate
 
@@ -2049,8 +2067,8 @@ contains
        !
 
        ! Fill the t, q, u, v, ... arrays with data from the nextread structure.
-       call copyfrom_inputstruct(nextread, t, q, u, v, p, lw, sw, pcp,vegfra, lai,BurnSeverity, &
-                                 update_veg, update_lai, xstart, xend, ystart, yend)
+       call copyfrom_inputstruct(nextread, t, q, u, v, p, lw, sw, pcp, snow, vegfra, lai, &
+                                 update_veg, update_lai, xstart, xend, ystart, yend, BurnSeverity)
 
        ! Clear the old lastread data
        call clear_inputstruct(lastread)
@@ -2074,7 +2092,7 @@ contains
 
        ! Fill the t, q, u, v, ... arrays with data interpolated between lastread and nextread times.
        call interpolate_inputstruct(lastread, nextread, target_date, &
-            t, q, u, v, p, lw, sw, pcp, vegfra, lai, BurnSeverity,update_veg, update_lai, xstart, xend, ystart, yend)
+            t, q, u, v, p, lw, sw, pcp, snow, vegfra, lai, update_veg, update_lai, xstart, xend, ystart, yend, BurnSeverity)
 
     else
 
@@ -2125,31 +2143,34 @@ contains
     allocate(instruct%pcp (xstart:xend,ystart:yend), stat=allostat )
     if (allostat/=0) stop "FATAL ERROR: In allocate_inputstruct() - Problem allocating instruct%pcp"
 
+    allocate(instruct%snow (xstart:xend,ystart:yend), stat=allostat )
+    if (allostat/=0) stop "Problem allocating instruct%snow"
+
     allocate(instruct%vegfra(xstart:xend,ystart:yend), stat=allostat )
     if (allostat/=0) stop "FATAL ERROR: In allocate_inputstruct()- Problem allocating instruct%vegfra"
 
     allocate(instruct%lai (xstart:xend,ystart:yend), stat=allostat )
     if (allostat/=0) stop "FATAL ERROR: In allocate_inputstruct() - Problem allocating instruct%lai"
-
-    allocate(instruct%BurnSeverity (xstart:xend,ystart:yend), stat=allostat )
-    if (allostat/=0) stop "FATAL ERROR: In allocate_inputstruct() - Problem allocating instruct%BurnSeverity"
-
-
 #ifdef MPP_LAND
     instruct%lai = 0.0
 #endif
+    !Added: burn severity forcing (post-fire snow albedo perturbation)
+    allocate(instruct%BurnSeverity (xstart:xend,ystart:yend), stat=allostat )
+    if (allostat/=0) stop "FATAL ERROR: In allocate_inputstruct() - Problem allocating instruct%BurnSeverity"
   end subroutine allocate_inputstruct
 
 !---------------------------------------------------------------------------------------------------------
 !---------------------------------------------------------------------------------------------------------
 
-  subroutine copyfrom_inputstruct(instruct, t, q, u, v, p, lw, sw, pcp,vegfra, lai, BurnSeverity,&
-                                  update_veg, update_lai, xstart, xend, ystart, yend)
+  subroutine copyfrom_inputstruct(instruct, t, q, u, v, p, lw, sw, pcp, snow, vegfra, lai, &
+                                  update_veg, update_lai, xstart, xend, ystart, yend, BurnSeverity)
     implicit none
     type(inputstruct), intent(in) :: instruct
     integer,           intent(in) :: xstart, xend, ystart, yend
     logical,           intent(in)  :: update_veg, update_lai  ! Barlage v3.7: for veg read control
-    real, dimension(xstart:xend,ystart:yend), intent(out) :: t, q, u, v, p, lw, sw, pcp,vegfra, lai,BurnSeverity
+    real, dimension(xstart:xend,ystart:yend), intent(out) :: t, q, u, v, p, lw, sw, pcp, snow, vegfra, lai
+    !Added: burn severity forcing (post-fire snow albedo perturbation)
+    real, dimension(xstart:xend,ystart:yend), intent(out) :: BurnSeverity
     t    = instruct%t
     q    = instruct%q
     u    = instruct%u
@@ -2157,8 +2178,9 @@ contains
     p    = instruct%p
     lw   = instruct%lw
     sw   = instruct%sw
+    snow = instruct%snow
     pcp  = instruct%pcp
-    BurnSeverity=instruct%BurnSeverity
+    BurnSeverity = instruct%BurnSeverity
     if(update_veg) vegfra = instruct%vegfra
     if(update_lai)   lai  = instruct%lai
   end subroutine copyfrom_inputstruct
@@ -2167,13 +2189,16 @@ contains
 !---------------------------------------------------------------------------------------------------------
 
   subroutine interpolate_inputstruct(instructA, instructB, target_date, &
-       t, q, u, v, p, lw, sw, pcp,vegfra, lai,BurnSeverity, update_veg, update_lai, xstart, xend, ystart, yend)
+       t, q, u, v, p, lw, sw, pcp, snow, vegfra, lai, update_veg, update_lai, xstart, xend, ystart, yend, BurnSeverity)
     implicit none
     type(inputstruct),                        intent(in)  :: instructA, instructB
     character(len=19),                        intent(in)  :: target_date
     integer,                                  intent(in)  :: xstart, xend, ystart, yend
     logical,                                  intent(in)  :: update_veg, update_lai  ! Barlage v3.7: for veg read control
-    real, dimension(xstart:xend,ystart:yend), intent(out) :: t, q, u, v, p, lw, sw, pcp,vegfra, lai,BurnSeverity
+    real, dimension(xstart:xend,ystart:yend), intent(out) :: t, q, u, v, p, lw, sw, pcp, snow, vegfra, lai
+    !Added: burn severity forcing (post-fire snow albedo perturbation) - held fixed across
+    !the interpolation window, consistent with how snow/pcp are handled below.
+    real, dimension(xstart:xend,ystart:yend), intent(out) :: BurnSeverity
 
     integer :: idts, idts2
     real    :: fraction
@@ -2189,9 +2214,9 @@ contains
     p  = ( instructA%p  * fraction ) + ( instructB%p  * (1.0-fraction) )
     lw = ( instructA%lw * fraction ) + ( instructB%lw * (1.0-fraction) )
     sw = ( instructA%sw * fraction ) + ( instructB%sw * (1.0-fraction) )
-    BurnSeverity = instructA%BurnSeverity
+    snow = instructA%snow
     pcp = instructA%pcp
-    
+    BurnSeverity = instructA%BurnSeverity
     if(update_veg) vegfra = instructA%vegfra
     if(update_lai)   lai  = instructA%lai
   end subroutine interpolate_inputstruct
@@ -2243,6 +2268,11 @@ contains
        nullify(instruct%pcp)
     endif
 
+    if (associated(instruct%snow)) then
+       deallocate(instruct%snow)
+       nullify(instruct%snow)
+    endif
+
     if (associated(instruct%vegfra)) then
        deallocate(instruct%vegfra)
        nullify(instruct%vegfra)
@@ -2253,14 +2283,10 @@ contains
        nullify(instruct%lai)
     endif
 
-    !Added by Ronnie:
     if (associated(instruct%BurnSeverity)) then
-        deallocate(instruct%BurnSeverity)
-        nullify(instruct%BurnSeverity)
+       deallocate(instruct%BurnSeverity)
+       nullify(instruct%BurnSeverity)
     endif
-    
-
-
   end subroutine clear_inputstruct
 
 !---------------------------------------------------------------------------------------------------------
@@ -2281,7 +2307,6 @@ contains
     nullify(instruct%vegfra)
     nullify(instruct%lai)
     nullify(instruct%BurnSeverity)
-
   end subroutine nullify_inputstruct
 
 !---------------------------------------------------------------------------------------------------------
@@ -3039,9 +3064,10 @@ contains
     integer,                               intent(in) :: iswater
     integer, dimension(ixpar,jxpar),       intent(in) :: vegtyp
     integer, dimension(global_nx,global_ny) :: gvegtyp
-    integer, dimension(ixpar,jxpar), optional, intent(in) :: glacinfo
-    real,    dimension(ixpar,jxpar), optional, intent(in) :: glact
-    real,    dimension(ixpar,jxpar),           intent(in) :: vis_icealb
+    ! the following three vars have ixpar, jxpar bounds
+    integer, dimension(:,:), allocatable, intent(in) :: glacinfo
+    real,    dimension(:,:), allocatable, intent(in) :: glact
+    real,    dimension(:,:), allocatable, intent(in) :: vis_icealb
 
     call write_io_int(vegtyp, gvegtyp)
     if(my_id .eq. io_id) then
@@ -3060,7 +3086,7 @@ contains
        ixfull, jxfull, ixpar, jxpar, xstartpar, ystartpar,                                    &
        nsoil, nsnow, dx, dy, truelat1, truelat2, mapproj, lat1, lon1, cen_lon,                       &
        iswater, vegtyp, act_level)
-
+    use iso_fortran_env, only : compiler_version
     implicit none
 #include <netcdf.inc>
 
@@ -3098,9 +3124,9 @@ contains
 
 #ifdef _PARALLEL_
 
-    call MPI_COMM_RANK(HYDRO_COMM_WORLD, rank, ierr)
+    call MPI_Comm_rank(HYDRO_COMM_WORLD, rank, ierr)
     if (ierr /= MPI_SUCCESS) stop "FATAL ERROR: In module_hrldas_netcdf_io.F"// &
-                                  " prepare_restart_file_seq() - MPI_COMM_RANK problem"
+                                  " prepare_restart_file_seq() - MPI_Comm_rank problem"
 
 #else
 
@@ -3145,6 +3171,7 @@ contains
          ierr = nf90_def_dim(ncid, "glacier_levels", act_level, dimid_glacier_layers)
 
     ierr = nf90_put_att(ncid, NF90_GLOBAL, "TITLE", "RESTART FILE FROM HRLDAS "//version)
+    ierr = nf90_put_att(ncid, NF90_GLOBAL, "compiler_version", compiler_version())
     ierr = nf90_put_att(ncid, NF90_GLOBAL, "missing_value", -1.E33)
 
     date19(1:19) = "0000-00-00_00:00:00"
@@ -3431,9 +3458,9 @@ contains
     restart_filename_remember = restart_flnm
 
 #ifdef _PARALLEL_
-    call MPI_COMM_RANK(HYDRO_COMM_WORLD, rank, ierr)
+    call MPI_Comm_rank(HYDRO_COMM_WORLD, rank, ierr)
     if (ierr /= MPI_SUCCESS) stop "FATAL ERROR: In module_hrldas_netcdf_io.F "// &
-                                  "read_restart() - MPI_COMM_RANK"
+                                  "read_restart() - MPI_Comm_rank"
 
     ierr = nf90_open_par(trim(restart_flnm), NF90_NOWRITE, HYDRO_COMM_WORLD, MPI_INFO_NULL, ncid)
 #else
@@ -3613,9 +3640,9 @@ contains
 
 #ifdef _PARALLEL_
 
-    call MPI_COMM_RANK(HYDRO_COMM_WORLD, rank, ierr)
+    call MPI_Comm_rank(HYDRO_COMM_WORLD, rank, ierr)
     if (ierr /= MPI_SUCCESS) stop "FATAL ERROR: In module_hrldas_netcdf_io.F "// &
-                                  "get_from_restart_2d_float() - MPI_COMM_RANK"
+                                  "get_from_restart_2d_float() - MPI_Comm_rank"
 
     ierr = nf90_open_par(trim(restart_filename_remember), NF90_NOWRITE, HYDRO_COMM_WORLD, MPI_INFO_NULL, ncid)
 
