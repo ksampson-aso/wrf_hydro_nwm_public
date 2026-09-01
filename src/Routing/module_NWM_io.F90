@@ -1227,7 +1227,7 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              1,1,1,&               !105-107
                              1,1,1,&               !108-110
                              1,1,1,&               !111-113
-                             1,1,1]                !114
+                             1,1,1,1]                !114-117
 
   else if(nlst(1)%io_config_outputs .eq. 1) then
       ! Analysis and Assimilation
@@ -1246,7 +1246,7 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,&               !105-107
                              0,0,0,&               !108-110
                              0,0,0,&               !111-113
-                             0,0,0]                !114
+                             0,0,0,0]                !114-117
 
    else if(nlst(1)%io_config_outputs .eq. 2) then
       ! Short Range
@@ -1265,7 +1265,7 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,&               !105-107
                              0,0,0,&               !108-110
                              0,0,0,&               !111-113
-                             0,0,0]                !114
+                             0,0,0,0]                !114-117
 
    else if(nlst(1)%io_config_outputs .eq. 3) then
       ! Medium Range
@@ -1284,7 +1284,7 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,&               !105-107
                              0,0,0,&               !108-110
                              0,0,0,&               !111-113
-                             0,0,0]                !114
+                             0,0,0,0]                !114-117
 
    else if(nlst(1)%io_config_outputs .eq. 4) then
       ! Long Range
@@ -1303,7 +1303,7 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,&               !105-107
                              0,0,0,&               !108-110
                              0,0,0,&               !111-113
-                             0,0,0]                !114
+                             0,0,0,0]                !114-117
 
    else if(nlst(1)%io_config_outputs .eq. 5) then
       ! Retrospective
@@ -1322,7 +1322,7 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,&               !105-107
                              1,1,0,&               !108-110
                              1,0,0,&               !111-113
-                             1,1,1]                !114
+                             1,1,1,0]                !114-117
 
    else if(nlst(1)%io_config_outputs .eq. 6) then
       ! Diagnostics
@@ -1341,7 +1341,7 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,&               !105-107
                              1,1,0,&               !108-110
                              1,0,0,&               !111-113
-                             1,1,1]                !114
+                             1,1,1,0]                !114-117
    else
       call nwmCheck(diagFlag,1,'ERROR: Invalid IOC flag provided by namelist file.')
    endif
