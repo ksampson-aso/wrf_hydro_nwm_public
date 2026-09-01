@@ -1,3 +1,23 @@
+!  Program Name:
+!  Author(s)/Contact(s):
+!  Abstract:
+!  History Log:
+!  <brief list of changes to this source file>
+!
+!  Usage:
+!  Parameters: <Specify typical arguments passed>
+!  Input Files:
+!        <list file names and briefly describe the data they include>
+!  Output Files:
+!        <list file names and briefly describe the information they include>
+!
+!  Condition codes:
+!        <list exit condition or error codes returned >
+!        If appropriate, descriptive troubleshooting instructions or
+!        likely causes for failures could be mentioned here with the
+!        appropriate error code
+!
+!  User controllable options: <if applicable>
 
 !2345678
 
@@ -54,9 +74,7 @@
 
        subroutine HYDRO_frocing_drv (indir,forc_typ, snow_assim,olddate,     &
           ixs, ixe,jxs,jxe,                       &
-          forcing_name_T,forcing_name_Q,forcing_name_U,forcing_name_V,forcing_name_P, &
-          forcing_name_LW,forcing_name_SW,forcing_name_PR,forcing_name_SN, forcing_name_LF,&
-          T2,Q2X,U,V,PRES,XLONG,SHORT,PRCP1,lai,SNOWBL,fpar,snodep, kt, FORCING_TIMESTEP,pcp_old)
+          T2,Q2X,U,V,PRES,XLONG,SHORT,PRCP1,BurnSeverity,lai,fpar,snodep, kt, FORCING_TIMESTEP,pcp_old)
 
          use module_lsm_forcing, only: read_hydro_forcing
          use config_base, only: nlst
@@ -65,32 +83,19 @@
          integer ix,jx, kt
          character(len=19) :: olddate
          character(len=*) :: indir
-         character(len=256), intent(in)  :: forcing_name_T
-         character(len=256), intent(in)  :: forcing_name_Q
-         character(len=256), intent(in)  :: forcing_name_U
-         character(len=256), intent(in)  :: forcing_name_V
-         character(len=256), intent(in)  :: forcing_name_P
-         character(len=256), intent(in)  :: forcing_name_LW
-         character(len=256), intent(in)  :: forcing_name_SW
-         character(len=256), intent(in)  :: forcing_name_PR
-         character(len=256), intent(in)  :: forcing_name_SN
-         character(len=256), intent(in)  :: forcing_name_LF
-         real, dimension(ixs:ixe,jxs:jxe):: T2,Q2X,U,V,PRES,XLONG,SHORT,PRCP1, &
-                 lai, snowbl, fpar, snodep, pcp_old
+         real, dimension(ixs:ixe,jxs:jxe):: T2,Q2X,U,V,PRES,XLONG,SHORT,PRCP1,BurnSeverity, &
+                 lai, fpar,snodep, pcp_old
          integer :: forc_typ, snow_assim, FORCING_TIMESTEP
 
          ix = ixe-ixs+1
          jx = jxe-jxs+1
          did = 1
-
          call read_hydro_forcing( &
             indir, olddate, &
             nlst(did)%hgrid,&
             ix,jx,forc_typ,snow_assim,  &
-            forcing_name_T,forcing_name_Q,forcing_name_U,forcing_name_V,forcing_name_P, &
-            forcing_name_LW,forcing_name_SW,forcing_name_PR,forcing_name_SN, forcing_name_LF,&
-            T2,q2x,u,v,pres,xlong,short,prcp1,&
-            lai,snowbl,fpar,snodep,FORCING_TIMESTEP*1.0,kt, pcp_old)
+            T2,q2x,u,v,pres,xlong,short,prcp1,BurnSeverity,&
+            lai,fpar,snodep,FORCING_TIMESTEP*1.0,kt, pcp_old)
        end subroutine HYDRO_frocing_drv
 
        subroutine get_greenfrac(inFile,greenfrac, idim, jdim, olddate,SHDMAX)
@@ -394,14 +399,6 @@
          integer :: did, iocflag
          iocflag = nlst(did)%io_config_outputs
       end subroutine get_iocflag
-
-      subroutine get_rstrt_swc(did, restart_flag)
-         use config_base, only: nlst
-         implicit none
-         integer, intent(in)  :: did
-         integer, intent(out) :: restart_flag
-         restart_flag = nlst(did)%RSTRT_SWC
-      end subroutine
 
       subroutine get_t0OutputFlag(did, t0OutputFlag)
         use config_base, only: nlst
